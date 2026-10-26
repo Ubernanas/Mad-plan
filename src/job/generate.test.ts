@@ -115,18 +115,31 @@ test("a week without candidates sends no recipes and does not ask for them", asy
   assert.doesNotMatch(run.prompts[0]!, /fra recipes/);
 });
 
-test("recipeId must be a main and sideRecipeId a side from the week's recipes; each main is used once", () => {
+test("recipeId and sideRecipeId must be among the week's recipes, of either kind; a main is used once", () => {
   const products = loadProducts(seededDb(), "2026-W43", "Netto", []);
   const recipes = new Map([[1, bourbon], [2, lemonPotatoes]]);
   const answer = good();
   answer.dishes[0]!.recipeId = 1;
   answer.dishes[1]!.recipeId = 1;
+  answer.dishes[2]!.recipeId = 99;
+  answer.dishes[2]!.sideRecipeId = 98;
+  const errors = validateResponse(answer, products, household, { items: [] }, recipes);
+  assert.ok(errors.includes("recipeId 99 findes ikke i recipes."), errors.join("\n"));
+  assert.ok(errors.some((e) => e.startsWith("To retter har samme recipeId")), errors.join("\n"));
+  assert.ok(errors.some((e) => e.endsWith("sideRecipeId 98 findes ikke i recipes.")), errors.join("\n"));
+  // A main used as a side (fried cabbage with bacon next to duck) is fine.
+  answer.dishes[1]!.recipeId = undefined;
   answer.dishes[2]!.recipeId = 2;
   answer.dishes[2]!.sideRecipeId = 1;
-  const errors = validateResponse(answer, products, household, { items: [] }, recipes);
-  assert.ok(errors.includes("recipeId 2 er ikke en hovedret i recipes."), errors.join("\n"));
-  assert.ok(errors.some((e) => e.startsWith("To retter har samme recipeId")), errors.join("\n"));
-  assert.ok(errors.some((e) => e.endsWith("sideRecipeId 1 er ikke et tilbehør i recipes.")), errors.join("\n"));
+  assert.deepEqual(validateResponse(answer, products, household, { items: [] }, recipes), []);
+});
+
+test("curry with rice is accepted: whether a dish is a whole dinner is Claude's call", () => {
+  const products = loadProducts(seededDb(), "2026-W43", "Netto", []);
+  const answer = good();
+  answer.dishes[0]!.title = "Thailandsk kylling i jordnøddecurry med ris";
+  answer.dishes[0]!.ingredients = answer.dishes[0]!.ingredients.filter((i) => i.productId !== "3"); // no vegetables
+  assert.deepEqual(validateResponse(answer, products, household), []);
 });
 
 test("shrimp made with chicken keeps its place in the plan, but not the recipe's credit", async () => {
@@ -145,7 +158,7 @@ test("shrimp made with chicken keeps its place in the plan, but not the recipe's
   assert.ok(logged.some((m) => m.includes('har ikke proteinet fra "Cajun Sauteed Shrimp"')));
 });
 
-test("duck, lamb and game are protein too, so confit de canard is a whole dinner", () => {
+test("a dish built on the kitchen's confit de canard is accepted", () => {
   const products = loadProducts(seededDb(), "2026-W43", "Netto", []);
   const answer = good();
   answer.dishes[0]!.ingredients[0] = { name: "confit de canard", qty: 360, unit: "g", kitchenItem: "k1", checkLabel: false };
@@ -193,38 +206,6 @@ test("an ingredient without a product is bought anyway, on the list as \"pris uk
   assert.equal(plan.totalPurchaseCost, 20 + 40 + 10);
   assert.equal(plan.options[1]!.unpriced, 1);
   assert.equal(plan.leftovers.some((l) => l.item === "Lime"), false);
-});
-
-test("every dish is a whole dinner: protein, a filling side and vegetables", () => {
-  const products = loadProducts(seededDb(), "2026-W43", "Netto", []);
-  const answer = good();
-  const [skewers, rice, carrots] = [answer.dishes[0]!, answer.dishes[1]!, answer.dishes[2]!];
-  skewers.title = "Græsk kyllingespyd";
-  skewers.ingredients = skewers.ingredients.filter((i) => i.productId === "2"); // only the chicken
-  rice.ingredients = rice.ingredients.filter((i) => i.productId !== "2"); // no protein
-  carrots.ingredients = carrots.ingredients.filter((i) => i.productId !== "3"); // no vegetables
-  const errors = validateResponse(answer, products, household);
-  assert.ok(errors.some((e) => e.startsWith("Græsk kyllingespyd: retten mangler mættende tilbehør")), errors.join("\n"));
-  assert.ok(errors.some((e) => e.startsWith("Græsk kyllingespyd: retten mangler grønt")), errors.join("\n"));
-  assert.ok(errors.some((e) => e.startsWith(`${rice.title}: retten mangler protein`)), errors.join("\n"));
-  assert.ok(errors.some((e) => e.startsWith(`${carrots.title}: retten mangler grønt`)), errors.join("\n"));
-  assert.equal(errors.length, 4, errors.join("\n"));
-});
-
-test("ketchup is not a vegetable, but potatoes and rice from the kitchen are a side", () => {
-  const db = seededDb();
-  db.prepare(`INSERT INTO products (week, store, goma_id, query, name, package_amount, unit, price, normal_price, per_kg, on_offer, fetched_at)
-    VALUES ('2026-W43', 'Netto', '4', 'ketchup', 'Tomatketchup', 500, 'g', 9, NULL, NULL, 0, 'x')`).run();
-  const products = loadProducts(db, "2026-W43", "Netto", []);
-  const answer = good();
-  answer.dishes[0]!.ingredients = [
-    { name: "kylling", qty: 250, unit: "g", productId: "2", checkLabel: false },
-    { name: "ketchup", qty: 40, unit: "g", productId: "4", checkLabel: false },
-    { name: "kartofler", qty: 400, unit: "g", kitchenItem: "k1", checkLabel: false },
-  ];
-  const kitchen = { items: [{ id: 1, name: "Kartofler", qty: 1000, unit: "g" as const, location: "skab" as const, expires: null, productId: null, source: null }] };
-  const errors = validateResponse(answer, products, household, kitchen);
-  assert.deepEqual(errors, [`${answer.dishes[0]!.title}: retten mangler grønt (grøntsager eller salat; løg, hvidløg og krydderurter tæller ikke). Tilføj et tilbehør fra recipes eller et enkelt tilbehør, og skriv trinene til det.`]);
 });
 
 function seededDb() {

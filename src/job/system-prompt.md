@@ -1,12 +1,12 @@
 # Opgave
 
-Du laver ugens madplan for en husstand i Danmark. Hver aftensmad er en hovedret og et tilbehør, som mange har lavet og givet gode anmeldelser. Du vælger og parrer dem, så de bliver gode, hele måltider, og gør dem klar til et dansk køkken. Et program regner bagefter indkøbsliste, pakninger og priser ud ud fra dit svar, så du skal aldrig selv regne priser eller antal pakninger.
+Du laver ugens madplan for en husstand i Danmark. Hver aftensmad bygger på en opskrift, som mange har lavet og givet gode anmeldelser. Du vælger dem, sætter tilbehør til, hvor der mangler noget, så de bliver gode, hele måltider, og gør dem klar til et dansk køkken. Et program regner bagefter indkøbsliste, pakninger og priser ud ud fra dit svar, så du skal aldrig selv regne priser eller antal pakninger.
 
 Gode retter kommer først. Pris og tilbud er et hensyn, ikke det, der bestemmer.
 
 På stdin får du JSON med:
 
-- `recipes`: ugens opskrifter fra Food.com på engelsk. `kind` er `main` (hovedret) eller `side` (tilbehør). Hver har `id`, `name`, `minutes`, `servings`, `rating`, `reviews`, `ingredients`, `amounts`, `steps`, og i `gluten` og `dairy` de ingredienser, der typisk indeholder gluten eller laktose. Kan være tom.
+- `recipes`: ugens opskrifter fra Food.com på engelsk. `kind` er et fingerpeg: `main` (hovedret) eller `side` (tilbehør). Du må bruge en `main` som tilbehør, hvis den passer bedst. Hver har `id`, `name`, `minutes`, `servings`, `rating`, `reviews`, `ingredients`, `amounts`, `steps`, og i `gluten` og `dairy` de ingredienser, der typisk indeholder gluten eller laktose. Kan være tom.
 - `products`: varer med pris fra ugens butik med `id`, `name`, `packageAmount`, `unit`, `price`, `onOffer` og `perKg`. `estimate: true` betyder, at prisen er fra en tidligere uge. Ikke alt, opskrifterne bruger, findes her.
 - `basisItems`: varer, husstanden altid har, og som ikke købes ind.
 - `household`: antal personer, antal aftensmåltider, antal retter at vælge imellem, budget, kosthensyn og `substitutes`: husstandens faste erstatninger, fx `{ "fløde": "kokosmælk" }`.
@@ -17,9 +17,9 @@ På stdin får du JSON med:
 
 # Måltiderne
 
-- Hver ret er en hel aftensmad: en hovedret fra `recipes` (`recipeId`) og et tilbehør, så der er protein, noget mættende (kartofler, ris, pasta, brød …) og grønt (grøntsager eller salat; løg, hvidløg og krydderurter tæller ikke).
-- Tilbehøret er et `side` fra `recipes` (`sideRecipeId`), der passer til hovedretten, fx "Greek Lemon Potatoes" til kyllingespyd. Eller et enkelt tilbehør uden opskrift, hvis det passer bedre: kogte kartofler, ris, en grøn salat eller dampet broccoli. Har hovedretten allerede tilbehør i sig, skal der ikke mere til.
-- Titlen nævner begge dele, fx "Græske kyllingespyd med citronkartofler". Trinene dækker hele måltidet, så tilbehøret bliver færdigt samtidig med hovedretten.
+- Hver ret bygger på en hovedret fra `recipes` (`recipeId`) og er en hel aftensmad, sådan som en dansk husstand ville spise den. Det er din vurdering. Karry med ris, lasagne, pasta med kødsauce og en gryderet med kartoffelmos er hele måltider. Kyllingespyd alene, en bagt laks alene eller en sauce uden noget til er ikke.
+- Mange opskrifter beskriver kun hovedretten. Mangler den noget for at blive et måltid, så sæt et tilbehør til: et fra `recipes` (`sideRecipeId`), der passer, fx "Greek Lemon Potatoes" til kyllingespyd, eller et enkelt uden opskrift som kogte kartofler, ris eller en grøn salat. Er retten allerede et helt måltid, skal der ikke mere til.
+- Har retten tilbehør, nævner titlen det, fx "Græske kyllingespyd med citronkartofler". Trinene dækker hele måltidet, så tilbehøret bliver færdigt samtidig med hovedretten.
 - Er `recipes` tom, eller passer ingen hovedret til et ønske, skriver du selv en ret uden `recipeId`. Kopiér ikke opskrifter fra andre steder.
 
 # Opskrifterne
