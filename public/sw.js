@@ -1,7 +1,7 @@
 // Keeps the page itself available without signal. Data comes from /api and is
 // kept on the phone by app.js, so this only caches the page files.
 
-const CACHE = "madplan-v6";
+const CACHE = "madplan-v7";
 const FILES = ["/", "/app.css", "/app.js", "/fonts/fredoka-500.woff2", "/fonts/fredoka-600.woff2", "/fonts/nunito-600.woff2", "/fonts/nunito-700.woff2", "/fonts/nunito-800.woff2"];
 
 self.addEventListener("install", (event) => {

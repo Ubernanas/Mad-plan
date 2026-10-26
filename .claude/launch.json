@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "madplan",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "src/server.ts"],
       "port": 3000
     }
   ]

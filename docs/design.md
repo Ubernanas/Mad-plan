@@ -49,7 +49,7 @@ Uge ───────────── Opskrift (niveau 2)
    ├ Vælg retter ── (niveau 2)
    └ ⚙ ─────────── Indstillinger (niveau 2)
 Indkøb
-Køkken (P3)
+Køkken (P3) ──── Køleskabsskærm (uden faner)
 ```
 
 ### I dag (forsiden)
@@ -98,6 +98,15 @@ Designet til én hånd i butikken:
 - Fritekstfeltet med "Lav planen" som primær knap (kun søndag før planen er lavet), ellers "Gem teksten". Er teksten rettet, kan "Brug listen, som den står" smide rettelsen væk.
 - Under det: beholdningen grupperet efter køl, frost og skab, med det, der snart udløber, øverst og markeret.
 - Nederst: en kort note om, at køkkenet er et skøn.
+
+### Køleskabsskærm
+
+En tablet på væggen i køkkenet, åbnet på `#/skaerm` (link nederst på Køkken). Ingen faner, samme 4 tekststørrelser, bare større, så den kan læses på afstand.
+
+- Til venstre: dato, "Frys i dag"-beskeder, dagens ret med "Se opskrift" og én linje om i morgen.
+- Til højre: køkkenbeholdningen som på Køkken. Står tabletten på højkant, kommer den under.
+- Skærmen holdes tændt kl. 6-22, så tabletten kan slukke om natten. Siden henter nye data hvert halve minut og genindlæser sig selv efter 12 timer, så den får nye versioner af appen.
+- "Til appen" øverst fører til I dag.
 
 ### Indstillinger
 

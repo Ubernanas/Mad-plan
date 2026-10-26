@@ -41,7 +41,7 @@ Byg én fase ad gangen. Gå først videre, når fasen har kørt et par søndage.
 
 ### Ikke i nogen fase
 
-Brugerkonti, flere husstande, notifikationer, bedømmelse af retter, byt én ret med et nyt Claude-kald (valg blandt forslagene dækker behovet), opskriftsdatabase, native app. Senere features står i `docs/ideer.md`: lagerkøb, "planlæg resten af ugen igen" og en køleskabsskærm. Byg dem ikke, men design datamodellen, så de kan tilføjes: gem kilopriser, og giv `kitchen`-tabellen mængde, enhed, placering (køl, frost, skab) og holdbarhed fra start.
+Brugerkonti, flere husstande, notifikationer, bedømmelse af retter, byt én ret med et nyt Claude-kald (valg blandt forslagene dækker behovet), opskriftsdatabase, native app. Senere features står i `docs/ideer.md`: lagerkøb og "planlæg resten af ugen igen". Køleskabsskærmen (`#/skaerm`) er bygget. Byg dem ikke, men design datamodellen, så de kan tilføjes: gem kilopriser, og giv `kitchen`-tabellen mængde, enhed, placering (køl, frost, skab) og holdbarhed fra start.
 
 ## Arkitektur
 

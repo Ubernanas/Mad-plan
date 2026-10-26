@@ -390,6 +390,20 @@ textarea::placeholder, input::placeholder { color: var(--muted); }
 body.has-actions main { padding-bottom: calc(var(--tabs-height) + 190px + env(safe-area-inset-bottom)); }
 body.has-actions .undo { bottom: calc(var(--tabs-height) + 94px + env(safe-area-inset-bottom)); }
 
+/* Fridge screen: a tablet on the wall, read from across the kitchen. No tabs, the
+   same four text sizes, only bigger. Two columns when the tablet lies down. */
+body.kiosk { --small: 16px; --body: 20px; --heading: 30px; --big: 52px; --tabs-height: 0px; }
+body.kiosk .tabs { display: none; }
+body.kiosk main { max-width: 1100px; padding: 20px 24px 120px; }
+.fridge-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.fridge-top .back { padding: 0 0 0 16px; white-space: nowrap; }
+.fridge .hero { height: 220px; }
+.fridge .hero .icon { width: 200px; height: 200px; }
+@media (min-width: 800px) {
+  .fridge { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+  .fridge-kitchen > .section:first-child { margin-top: 0; }
+}
+
 /* ---------- Motion ---------- */
 
 /* Gentle loops: one per screen at most. */

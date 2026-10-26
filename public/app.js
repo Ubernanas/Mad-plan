@@ -1,5 +1,5 @@
-// Madplan: four screens (I dag, Uge, Indkøb, Køkken) plus recipe, choice and
-// settings, rendered from /api/state. Ticks are saved on the phone first and sent
+// Madplan: four screens (I dag, Uge, Indkøb, Køkken) plus recipe, choice,
+// settings and the fridge screen, rendered from /api/state. Ticks are saved on the phone first and sent
 // to the server when there is a connection, so the shopping list never waits.
 
 const TZ = "Europe/Copenhagen";
@@ -22,6 +22,7 @@ let pending = store.get("pending", []);
 let loadError = false;
 let basketOpen = false;
 let planCountdown = null;
+const loadedAt = Date.now();
 
 // ---------- Dates, in Copenhagen time ----------
 
@@ -240,7 +241,9 @@ function schedulePoll() {
   clearTimeout(pollTimer);
   const fast = state?.job?.state === "running";
   pollTimer = setTimeout(() => {
-    if (document.visibilityState === "visible") loadState();
+    // Nobody reloads the fridge screen by hand, so it reloads itself to pick up new versions of the app.
+    if (route().name === "skaerm" && Date.now() - loadedAt > 12 * 3600000) location.reload();
+    else if (document.visibilityState === "visible") loadState();
     else schedulePoll();
   }, fast ? 5000 : 30000);
 }
@@ -494,16 +497,66 @@ function screenToday() {
     </section>`);
   }
 
+  parts.push(tomorrowLine(t, current));
+  return parts.join("");
+}
+
+/** One line about tomorrow's dish, so something can come out of the freezer. On Sunday it is next week's Monday. */
+function tomorrowLine(t, current) {
   const tomorrowPlan = t.index === 6 ? planFor(t.planWeek) : current;
   const tomorrow = mealOn(tomorrowPlan, DAYS[(t.index + 1) % 7]);
-  if (tomorrow) {
-    parts.push(`<div class="card" style="display:flex;align-items:center;gap:14px;padding:12px 14px;margin-top:18px">
+  if (!tomorrow) return "";
+  return `<div class="card" style="display:flex;align-items:center;gap:14px;padding:12px 14px;margin-top:18px">
       <span class="badge" style="background:var(--lilac)">${icon(dishIcon(tomorrow))}</span>
       <span class="main" style="min-width:0"><span class="small muted" style="display:block">I morgen</span><strong>${esc(tomorrow.title)}</strong></span>
-    </div>`);
+    </div>`;
+}
+
+// ---------- Køleskabsskærm ----------
+
+/** For a tablet on the wall: today's dish and the kitchen, readable across the room. No tabs. */
+function screenFridge() {
+  const t = today();
+  const current = planFor(t.week);
+  const slot = current?.days?.[t.index];
+  const meal = mealOn(current, t.day);
+  const date = new Intl.DateTimeFormat("da-DK", { timeZone: TZ, weekday: "long", day: "numeric", month: "long" }).format(new Date());
+
+  let dish;
+  if (slot?.status === "skipped") {
+    dish = `<section class="card stack"><div class="empty-art">${icon("pot")}</div><h1>I dag er sprunget over</h1></section>`;
+  } else if (meal) {
+    const done = meal.status === "done";
+    dish = `<section class="card ${done ? "mint" : "peach"} stack" style="position:relative">
+      <div class="hero">${icon(dishIcon(meal), done ? "" : "bob")}</div>
+      ${done ? `<span class="stamp">Lavet!</span>` : ""}
+      <h1>${esc(meal.title)}</h1>
+      <p class="muted">${meal.timeMinutes} min · ${meal.servings} portioner</p>
+      <a class="button secondary" href="#/opskrift/${current.week}/${meal.day}">Se opskrift</a>
+    </section>`;
+  } else {
+    dish = `<section class="card stack">
+      <div class="empty-art">${icon("pan")}</div>
+      <h1>${current ? "Ingen ret i dag" : "Ingen plan for denne uge"}</h1>
+      ${current ? "" : `<p class="muted">Planen laves søndag kl. ${PLAN_HOUR}.</p>`}
+    </section>`;
   }
 
-  return parts.join("");
+  const items = state.kitchen ?? [];
+  return `<header class="fridge-top">
+      <h1>${date[0].toUpperCase() + date.slice(1)}</h1>
+      <a class="back" href="#/i-dag">Til appen ›</a>
+    </header>
+    <div class="fridge">
+      <div>
+        ${(state.freezeAlerts ?? []).map((a) => freezeCard(a, true)).join("")}
+        ${dish}
+        ${tomorrowLine(t, current)}
+      </div>
+      <div class="fridge-kitchen">
+        ${items.length ? kitchenGroups(items) : `<div class="section card stack"><div class="empty-art">${icon("fridge")}</div><p class="muted">Køkkenet er tomt.</p></div>`}
+      </div>
+    </div>`;
 }
 
 function screenWeek() {
@@ -656,11 +709,9 @@ function freezeCard(alert, primary) {
   </section>`;
 }
 
-function screenKitchen() {
-  const t = today();
-  const items = state.kitchen ?? [];
-  const canPlan = t.index === 6 && !planFor(t.planWeek);
-  const groups = PLACES.map(([place, label]) => {
+/** The kitchen grouped by fridge, freezer and cupboard, with what runs out soon marked. */
+function kitchenGroups(items) {
+  return PLACES.map(([place, label]) => {
     const here = items.filter((i) => i.location === place);
     if (!here.length) return "";
     const rows = here.map((i) => {
@@ -672,7 +723,13 @@ function screenKitchen() {
       </div>`;
     });
     return `<div class="section"><h2 class="section-title" style="display:flex;align-items:center;gap:8px">${icon(PLACE_ICON[place]).replace('class="icon"', 'class="icon" style="width:30px;height:30px"')}${label}</h2><div class="list">${rows.join("")}</div></div>`;
-  });
+  }).join("");
+}
+
+function screenKitchen() {
+  const t = today();
+  const items = state.kitchen ?? [];
+  const canPlan = t.index === 6 && !planFor(t.planWeek);
   return `${(state.freezeAlerts ?? []).map((a) => freezeCard(a, false)).join("")}
     <section class="card stack">
       <label for="kitchen-text"><h1>Hvad har I i køkkenet?</h1></label>
@@ -683,8 +740,9 @@ function screenKitchen() {
         : `<button class="button secondary" data-action="kitchen-save">Gem teksten</button>`}
       ${state.kitchenEdited ? `<button class="button secondary" data-action="kitchen-reset">Brug listen, som den står</button>` : ""}
     </section>
-    ${items.length ? groups.join("") : `<div class="section card stack"><div class="empty-art">${icon("fridge")}</div><p class="muted">Køkkenet er tomt. Varer kommer hertil, når I krydser af på indkøbslisten, eller når teksten ovenfor bruges.</p></div>`}
-    <p class="section small muted">Køkkenet er et skøn. Frokoster og snacks bliver ikke talt med.</p>`;
+    ${items.length ? kitchenGroups(items) : `<div class="section card stack"><div class="empty-art">${icon("fridge")}</div><p class="muted">Køkkenet er tomt. Varer kommer hertil, når I krydser af på indkøbslisten, eller når teksten ovenfor bruges.</p></div>`}
+    <p class="section small muted">Køkkenet er et skøn. Frokoster og snacks bliver ikke talt med.</p>
+    <a class="back" href="#/skaerm">Vis som køleskabsskærm ›</a>`;
 }
 
 async function saveKitchenText(text) {
@@ -879,6 +937,7 @@ function render() {
   else if (name === "vaelg") html = screenChoose();
   else if (name === "indstillinger") html = screenSettings();
   else if (name === "koekken") html = screenKitchen();
+  else if (name === "skaerm") html = screenFridge();
   else html = screenToday();
 
   if (state && loadError) {
@@ -894,6 +953,7 @@ function render() {
   });
   app.innerHTML = html;
   document.body.classList.toggle("has-actions", !!app.querySelector(".actions"));
+  document.body.classList.toggle("kiosk", name === "skaerm");
   for (const draft of drafts) {
     const field = document.getElementById(draft.id);
     if (!field) continue;
@@ -909,7 +969,9 @@ function render() {
     if (link.dataset.tab === tab) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
   }
-  keepScreenOn(name === "opskrift" || name === "indkob");
+  // The fridge screen stays on in the daytime only, so the tablet can sleep at night.
+  const hour = today().hour;
+  keepScreenOn(name === "opskrift" || name === "indkob" || (name === "skaerm" && hour >= 6 && hour < 22));
 }
 
 // ---------- Screen stays on while cooking and shopping ----------
@@ -993,7 +1055,7 @@ document.addEventListener("toggle", (event) => {
 }, true);
 
 window.addEventListener("hashchange", () => {
-  if (route().name === "koekken") loadState();
+  if (["koekken", "skaerm"].includes(route().name)) loadState();
   render();
   window.scrollTo(0, 0);
 });
