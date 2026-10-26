@@ -31,6 +31,12 @@ export type Ingredient = {
   /** "k12": taken from the kitchen, so not bought. */
   kitchenItem?: string;
   basis?: boolean;
+  /**
+   * Bought, but no product this week has a price for it: it goes on the shopping list
+   * as "pris ukendt" under `section`, rather than ruling the dish out.
+   */
+  buy?: boolean;
+  section?: Section;
   checkLabel: boolean;
 };
 
@@ -43,10 +49,12 @@ export type Dish = {
   timeMinutes: number;
   steps: string[];
   ingredients: Ingredient[];
-  /** The Food.com recipe the dish is translated from. Missing when Claude wrote the dish itself. */
+  /** The Food.com main the dish is translated from. Missing when Claude wrote the dish itself. */
   recipeId?: number;
+  /** The Food.com side served with it. Missing for a plain side like boiled potatoes. */
+  sideRecipeId?: number;
   /** Added by the code from the dataset, never by Claude: what the recipe page credits. */
-  source?: RecipeSource;
+  sources?: RecipeSource[];
 };
 
 export type RecipeSource = { name: string; rating: number; reviews: number; url: string };
@@ -61,7 +69,13 @@ export type ClaudeResponse = {
   kitchen?: ConvertedItem[];
 };
 
-export type PriceSource = "offer" | "regular" | "estimate";
+/** "unknown": bought, but no product this week had a price ("pris ukendt"). */
+export type PriceSource = "offer" | "regular" | "estimate" | "unknown";
+
+/** The shopping-list key of an ingredient without a product: one line per name and unit. */
+export function buyKey(ingredient: Pick<Ingredient, "name" | "unit">): string {
+  return `buy:${ingredient.name.trim().toLowerCase()}:${ingredient.unit}`;
+}
 
 export type ShoppingItem = {
   productId: string;
@@ -85,8 +99,11 @@ export type ShoppingItem = {
 /** What is left of a product after the planned meals: a forecast, not what is really in the kitchen. */
 export type Leftover = { productId: string; item: string; amount: number; unit: Unit; value: number };
 
-/** A dish to choose from; id is its place in Claude's list. */
-export type DishOption = Dish & { id: number; mealCost: number; pricePerPortion: number };
+/**
+ * A dish to choose from; id is its place in Claude's list. The cost leaves out
+ * ingredients without a price, so with `unpriced` above 0 it is a lower bound.
+ */
+export type DishOption = Dish & { id: number; mealCost: number; pricePerPortion: number; unpriced: number };
 export type DayStatus = "planned" | "done" | "skipped";
 export type PlannedMeal = DishOption & { day: string; status: DayStatus };
 /** One day of the week. A skipped day has no dish: its dish moved to the next day. */
@@ -122,7 +139,10 @@ export type Plan = PlanMeta & {
   dropped: number[];
   meals: PlannedMeal[];
   shoppingList: ShoppingItem[];
+  /** What the priced lines cost; lines with "pris ukendt" come on top. */
   totalPurchaseCost: number;
+  /** Shopping-list lines without a price. */
+  unpricedCount: number;
   leftovers: Leftover[];
   leftoverValue: number;
   /** E.g. "Køb laks til lørdag senest fredag, eller frys den ned." Null when nothing needs it. */
@@ -151,7 +171,8 @@ export function computePlan(
       const product = ingredient.productId ? snapshot[ingredient.productId] : undefined;
       if (product) mealCost += (ingredient.qty / product.packageAmount) * product.price;
     }
-    return { ...dish, id, mealCost: kr(mealCost), pricePerPortion: kr(mealCost / dish.servings) };
+    const unpriced = dish.ingredients.filter((i) => i.buy).length;
+    return { ...dish, id, mealCost: kr(mealCost), pricePerPortion: kr(mealCost / dish.servings), unpriced };
   });
 
   const plan: Plan = {
@@ -169,6 +190,7 @@ export function computePlan(
     meals: [],
     shoppingList: [],
     totalPurchaseCost: 0,
+    unpricedCount: 0,
     leftovers: [],
     leftoverValue: 0,
     buyNote: null,
@@ -233,8 +255,16 @@ export function selectDishes(plan: Plan, selected: number[]): Plan {
   const meals = ids.map((id) => plan.options[id]!);
 
   const used = new Map<string, { amount: number; checkLabel: boolean; days: number[] }>();
+  const unknown = new Map<string, { ingredient: Ingredient; amount: number; checkLabel: boolean }>();
   meals.forEach((meal, dayIndex) => {
     for (const ingredient of meal.ingredients) {
+      if (ingredient.buy) {
+        const entry = unknown.get(buyKey(ingredient)) ?? { ingredient, amount: 0, checkLabel: false };
+        entry.amount += ingredient.qty;
+        entry.checkLabel ||= ingredient.checkLabel;
+        unknown.set(buyKey(ingredient), entry);
+        continue;
+      }
       if (!ingredient.productId) continue; // basis items are not bought
       const entry = used.get(ingredient.productId) ?? { amount: 0, checkLabel: false, days: [] };
       entry.amount += ingredient.qty;
@@ -274,12 +304,33 @@ export function selectDishes(plan: Plan, selected: number[]): Plan {
     };
   });
 
+  // No product had a price: bought as needed, shown with "pris ukendt".
+  for (const [key, { ingredient, amount, checkLabel }] of unknown) {
+    const name = ingredient.name.trim();
+    shoppingList.push({
+      productId: key,
+      section: ingredient.section && SECTIONS.includes(ingredient.section) ? ingredient.section : "kolonial",
+      item: name.charAt(0).toUpperCase() + name.slice(1),
+      packageSize: formatSize(amount, ingredient.unit),
+      packageAmount: amount,
+      unit: ingredient.unit,
+      usedAmount: amount,
+      packages: 1,
+      price: 0,
+      priceSource: "unknown",
+      checkLabel,
+      buyBefore: null,
+      buyEarly: false,
+    });
+  }
+
   shoppingList.sort(
     (a, b) => SECTIONS.indexOf(a.section) - SECTIONS.indexOf(b.section) || a.item.localeCompare(b.item, "da"),
   );
 
-  // Bought minus used, valued at the price per unit actually paid.
+  // Bought minus used, valued at the price per unit actually paid. Unpriced lines are bought as needed.
   const leftovers = shoppingList
+    .filter((line) => line.priceSource !== "unknown")
     .map((line): Leftover => {
       const amount = Math.round((line.packages * line.packageAmount - line.usedAmount) * 100) / 100;
       return { productId: line.productId, item: line.item, amount, unit: line.unit, value: kr((amount / line.packageAmount) * plan.products[line.productId]!.price) };
@@ -292,6 +343,7 @@ export function selectDishes(plan: Plan, selected: number[]): Plan {
     selected: ids,
     shoppingList,
     totalPurchaseCost: kr(shoppingList.reduce((sum, line) => sum + line.price, 0)),
+    unpricedCount: unknown.size,
     leftovers,
     leftoverValue: kr(leftovers.reduce((sum, leftover) => sum + leftover.value, 0)),
     buyNote: buyNote(shoppingList.filter((l) => l.buyEarly), [...lateDays].sort(), lastDay),

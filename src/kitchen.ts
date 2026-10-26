@@ -7,6 +7,7 @@ import { join } from "node:path";
 import type { Section } from "./config.ts";
 import type { DB } from "./db.ts";
 import type { Unit } from "./fetch/size.ts";
+import { buyKey } from "./job/compute.ts";
 
 export type Location = "køl" | "frost" | "skab";
 export type Category = "fisk" | "hakket" | "kød" | "grønt" | "køl" | "holdbart" | "frost";
@@ -126,7 +127,7 @@ export function convert(qty: number, from: Unit, to: Unit, name: string): number
 
 // ---------- "Lavet" ----------
 
-type Usage = { qty: number; unit: Unit; name: string; productId?: string; kitchenItem?: string; basis?: boolean };
+type Usage = { qty: number; unit: Unit; name: string; productId?: string; kitchenItem?: string; basis?: boolean; buy?: boolean };
 
 /** Takes a dish's ingredients out of the kitchen. Returns what was actually taken, for undo. */
 export function consume(db: DB, ingredients: Usage[]): Move[] {
@@ -134,10 +135,12 @@ export function consume(db: DB, ingredients: Usage[]): Move[] {
   const take = db.prepare("UPDATE kitchen SET qty = qty - ? WHERE id = ?");
   db.transaction(() => {
     for (const ing of ingredients) {
+      // Unpriced items were ticked into the kitchen under their shopping-list key.
+      const productId = ing.productId ?? (ing.buy ? buyKey(ing) : undefined);
       const rows: Row[] = ing.kitchenItem
         ? (db.prepare("SELECT * FROM kitchen WHERE id = ? AND qty > 0").all(kitchenId(ing.kitchenItem)) as Row[])
-        : ing.productId
-          ? (db.prepare("SELECT * FROM kitchen WHERE product_id = ? AND qty > 0 ORDER BY expires IS NULL, expires").all(ing.productId) as Row[])
+        : productId
+          ? (db.prepare("SELECT * FROM kitchen WHERE product_id = ? AND qty > 0 ORDER BY expires IS NULL, expires").all(productId) as Row[])
           : [];
       let left = ing.qty; // in the ingredient's unit
       for (const row of rows) {

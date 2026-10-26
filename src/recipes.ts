@@ -1,4 +1,5 @@
-// Recipes from the Food.com dataset (Kaggle "Food.com - Recipes and Reviews", CC0).
+// Recipes from the Food.com dataset (Kaggle "Food.com - Recipes and Reviews", CC0):
+// mains, and sides to serve with them, so a dinner is two recipes people made and liked.
 // scripts/import-recipes.ts filters the raw CSV once into recipes/foodcom.json.gz;
 // the Sunday job reads that file. Recipes are in English, and the amounts have no
 // units (the dataset lost them), so Claude reads the units from the steps when it
@@ -12,6 +13,8 @@ export type Protein = "chicken" | "beef" | "pork" | "fish" | "veg";
 
 export type Recipe = {
   id: number;
+  /** A dinner's main dish, or a side (potatoes, rice, salad, vegetables) to serve with one. */
+  kind: "main" | "side";
   name: string;
   category: string;
   minutes: number;
@@ -91,7 +94,12 @@ export const glutenIn = (names: string[]) => names.filter((n) => GLUTEN.test(n.t
 export const dairyIn = (names: string[]) => names.filter((n) => DAIRY.test(n.toLowerCase()));
 
 /** Recipes in these categories are mostly sides. As keywords they also tag mains, so only the category counts. */
-const SIDES = new Set(["Vegetable", "Potato", "Corn", "Greens", "Onions", "Spinach", "Yam/Sweet Potato", "Cauliflower", "Black Beans"]);
+const SIDE_CATEGORIES = new Set([
+  "Vegetable", "Potato", "Corn", "Greens", "Onions", "Spinach", "Yam/Sweet Potato", "Cauliflower", "Black Beans",
+  "White Rice", "Long Grain Rice", "Brown Rice", "Rice", "Asparagus", "Beans",
+]);
+/** Names that sound like something served with the main. */
+const SIDE_NAME = /potato|rice|pilaf|salad|slaw|fries|mash|vegetables|green beans|carrots|asparagus|broccoli|cauliflower|couscous|quinoa|corn\b|zucchini|squash|cucumber|tomatoes/i;
 
 /** Food.com categories and keywords that are never a dinner. */
 const NOT_DINNER = new Set([
@@ -101,20 +109,45 @@ const NOT_DINNER = new Set([
   "Chocolate Chip Cookies", "Coconut Cream Pie", "Tarts", "Sourdough Breads", "Bread Machine", "Brunch",
 ]);
 
-/** Names of things that come with a dinner rather than being one: marinades, dips, sides, sauces. */
-const NOT_A_MEAL = /marinade|\brub\b|\bdips?\b|dressing|hummus|deviled|guacamole|spread|seasoning|refried|potato salad|broccoli salad|pasta salad|coleslaw|\bslaw\b|appetizer|pickled|jerky|\bbrine\b|\bsauce$|\bglaze$|\bgravy$|stuffing/i;
+/** Names of things that are neither a dinner nor a side: marinades, dips, sauces. */
+const NOT_A_MEAL = /marinade|\brub\b|\bdips?\b|dressing|hummus|deviled|guacamole|spread|seasoning|refried|appetizer|pickled|jerky|\bbrine\b|\bsauce$|\bglaze$|\bgravy$|stuffing/i;
 
 export const LIMITS = { minRating: 4.5, minReviews: 10, maxMinutes: 75, minIngredients: 4, maxIngredients: 16, maxSteps: 14 };
+/** Sides are often short: "Boil the potatoes, toss with butter and dill." */
+export const SIDE_LIMITS = { ...LIMITS, minIngredients: 2, maxMinutes: 60 };
 
-/** One raw CSV row → a recipe worth suggesting for dinner, or null. */
-export function toRecipe(row: Record<string, string>, limits = LIMITS): Recipe | null {
+/**
+ * A side has no meat or fish of its own, bacon in a potato salad aside. Sausage and
+ * potatoes is a main, even though the name sounds like a side.
+ */
+function isSide(name: string, category: string, ingredients: string[], proteins: Protein[]): boolean {
+  if (!SIDE_CATEGORIES.has(category) && !SIDE_NAME.test(name)) return false;
+  if (/soup|chowder|chips\b/i.test(name)) return false;
+  const meat = proteins.filter((p) => p !== "veg");
+  if (meat.length === 0) return true;
+  const pork = ingredients.filter((i) => /\bpork\b|\bbacon\b|\bham\b|sausage|chorizo|pancetta/i.test(i));
+  return meat.length === 1 && meat[0] === "pork" && pork.every((i) => /bacon|pancetta/i.test(i));
+}
+
+/** One raw CSV row → a dinner main or a side worth serving with one, or null. */
+export function toRecipe(row: Record<string, string>): Recipe | null {
   const rating = Number(row.AggregatedRating);
   const reviews = Number(row.ReviewCount);
-  if (!(rating >= limits.minRating) || !(reviews >= limits.minReviews)) return null;
+  if (!(rating >= LIMITS.minRating) || !(reviews >= LIMITS.minReviews)) return null;
 
   const keywords = parseRVector(row.Keywords);
   const category = row.RecipeCategory ?? "";
-  if (SIDES.has(category) || NOT_DINNER.has(category) || keywords.some((k) => NOT_DINNER.has(k))) return null;
+  if (NOT_DINNER.has(category) || keywords.some((k) => NOT_DINNER.has(k))) return null;
+
+  const name = decodeHtml(row.Name!.trim());
+  if (NOT_A_MEAL.test(name)) return null;
+  const names = parseRVector(row.RecipeIngredientParts);
+  // The ingredient list sometimes lacks the meat that the name promises ("Chicken-Fried Steak").
+  let proteins = proteinsOf(names);
+  if (!proteins.length || (proteins.length === 1 && proteins[0] === "veg")) proteins = proteinsOf([...names, name]);
+  const kind = isSide(name, category, names, proteins) ? "side" : proteins.length ? "main" : null;
+  if (!kind) return null;
+  const limits = kind === "side" ? SIDE_LIMITS : LIMITS;
 
   const minutes = minutesOf(row.TotalTime);
   if (minutes === null || minutes <= 0 || minutes > limits.maxMinutes) return null;
@@ -123,21 +156,14 @@ export function toRecipe(row: Record<string, string>, limits = LIMITS): Recipe |
   const servings = row.RecipeServings === "NA" ? null : Number(row.RecipeServings);
   if (servings !== null && (!Number.isInteger(servings) || servings < 1 || servings > 12)) return null;
 
-  const names = parseRVector(row.RecipeIngredientParts);
   if (names.length < limits.minIngredients || names.length > limits.maxIngredients) return null;
 
   const steps = parseRVector(row.RecipeInstructions);
-  if (steps.length < 2 || steps.length > limits.maxSteps || steps.some((s) => s.length > 700)) return null;
-
-  // The ingredient list sometimes lacks the meat that the name promises ("Chicken-Fried Steak").
-  const name = decodeHtml(row.Name!.trim());
-  if (NOT_A_MEAL.test(name)) return null;
-  let proteins = proteinsOf(names);
-  if (!proteins.length || (proteins.length === 1 && proteins[0] === "veg")) proteins = proteinsOf([...names, name]);
-  if (!proteins.length) return null;
+  if (steps.length < (kind === "side" ? 1 : 2) || steps.length > limits.maxSteps || steps.some((s) => s.length > 700)) return null;
 
   return {
     id: Number(row.RecipeId),
+    kind,
     name,
     category,
     minutes,

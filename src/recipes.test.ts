@@ -57,6 +57,7 @@ const row = (over: Record<string, string> = {}): Record<string, string> => ({
 test("a well-rated dinner is kept, with what Claude needs", () => {
   assert.deepEqual(toRecipe(row()), {
     id: 68955,
+    kind: "main",
     name: "Japanese Mum's Chicken",
     category: "Chicken Thigh & Leg",
     minutes: 45,
@@ -83,22 +84,21 @@ test("the meat in the name counts when the ingredients only show eggs", () => {
   assert.deepEqual(recipe?.proteins.sort(), ["beef", "chicken"]);
 });
 
-test("recipes that are not a dinner, too slow, too few reviews or without protein are left out", () => {
+test("recipes that are neither a dinner nor a side, too slow, or with too few reviews are left out", () => {
   const rejects: Record<string, string>[] = [
     row({ AggregatedRating: "4" }),
     row({ ReviewCount: "9" }),
     row({ RecipeCategory: "Dessert" }),
-    row({ RecipeCategory: "Potato" }),
     row({ Keywords: 'c("Breakfast")' }),
     row({ TotalTime: "PT4H" }),
     row({ TotalTime: "NA" }),
     row({ RecipeServings: "24" }),
     row({ RecipeIngredientParts: 'c("chicken", "salt")' }),
     row({ RecipeInstructions: 'c("Mix it all.")' }),
-    row({ Name: "Plain Rice", RecipeIngredientParts: 'c("rice", "water", "salt", "butter")' }),
+    row({ Name: "Garlic Bread", RecipeIngredientParts: 'c("bread", "garlic", "salt", "butter")' }),
     row({ Name: "Amazing Chicken Marinade" }),
     row({ Name: "Deviled Eggs" }),
-    row({ Name: "Authentic German Potato Salad" }),
+    row({ Name: "Creamy Potato Soup", RecipeCategory: "Potato", RecipeIngredientParts: 'c("potatoes", "milk", "onion")' }),
     row({ Name: "Easy Bourbon BBQ Sauce" }),
   ];
   for (const r of rejects) assert.equal(toRecipe(r), null, JSON.stringify(r));
@@ -111,4 +111,14 @@ test("Potato as a keyword does not hide a main course", () => {
 test("a dish with a sauce in the middle of its name is still a dinner, and crab is fish", () => {
   assert.ok(toRecipe(row({ Name: "Chicken in Garlic Sauce with Rice" })));
   assert.deepEqual(proteinsOf(["lump crabmeat", "eggs"]), ["fish"]);
+});
+
+test("sides are kept: potatoes, rice and salads without meat, bacon in a potato salad allowed", () => {
+  const side = (over: Record<string, string>) => toRecipe(row({ RecipeCategory: "Potato", RecipeInstructions: 'c("Boil and toss.")', ...over }));
+  assert.equal(side({ Name: "Greek Lemon Potatoes", RecipeIngredientParts: 'c("potatoes", "lemon", "olive oil", "oregano")' })?.kind, "side");
+  assert.equal(side({ Name: "Plain Rice", RecipeCategory: "White Rice", RecipeIngredientParts: 'c("rice", "water")' })?.kind, "side");
+  assert.equal(side({ Name: "Authentic German Potato Salad", RecipeIngredientParts: 'c("potatoes", "bacon", "vinegar", "onion")' })?.kind, "side");
+  // Sausage and potatoes is a dinner, and a one-step main is too thin to follow.
+  assert.equal(side({ Name: "Sausage, Peppers, and Potatoes", RecipeIngredientParts: 'c("smoked sausage", "potatoes", "peppers", "onion")', RecipeInstructions: 'c("Fry.", "Serve.")' })?.kind, "main");
+  assert.equal(side({ Name: "Sausage and Potatoes", RecipeIngredientParts: 'c("smoked sausage", "potatoes", "peppers", "onion")' }), null);
 });

@@ -59,6 +59,13 @@ test("'Lavet' takes the ingredients out, never below 0, and undo puts back exact
   assert.deepEqual([back.okse, back.laks], [800, 250]);
 });
 
+test("an item bought without a price is ticked in and taken out by its shopping-list key", () => {
+  const db = openDb(":memory:");
+  syncPurchase(db, 1, line("buy:lime:stk", "Lime", "frugt og grønt", 2, "stk"), true, "2026-10-26");
+  consume(db, [{ name: "lime", qty: 1, unit: "stk", buy: true }]);
+  assert.deepEqual(listKitchen(db).map((k) => `${k.qty} ${k.name}`), ["1 Lime"]);
+});
+
 test("pieces and grams convert with units.json", () => {
   assert.equal(convert(2, "stk", "g", "løg"), 300);
   assert.equal(convert(300, "g", "stk", "Rødløg"), 2.5);

@@ -108,7 +108,7 @@ test("stops before saving when more than half of the item list is empty", async 
 test("recipes decide the extra search words; words Goma lacks are estimates and skipped next week", async () => {
   const db = openDb(":memory:");
   const recipe = (id: number, ingredients: string[]): Recipe => ({
-    id, name: `Ret ${id}`, category: "Chicken", minutes: 30, servings: 4, rating: 5, reviews: 100,
+    id, kind: "main", name: `Ret ${id}`, category: "Chicken", minutes: 30, servings: 4, rating: 5, reviews: 100,
     ingredients, amounts: ingredients.map(() => "1"), steps: ["Cook.", "Serve."], proteins: ["chicken"], gluten: [], dairy: [],
   });
   const recipes = [
@@ -120,7 +120,7 @@ test("recipes decide the extra search words; words Goma lacks are estimates and 
     fetchWeek({ db, http: fakeHttp(pages), household, items: ["kylling", "ris"], recipes: list, rules: loadIngredientRules(), now, log: () => {} });
 
   const summary = await run(FRIDAY);
-  // Each recipe lacks a price for one ingredient (garlic, ginger), which Claude can work around.
+  // Garlic and ginger have no price this week; the recipes stay, and those go on the list as "pris ukendt".
   assert.deepEqual(summary.candidates.map((r) => r.id).sort(), [1, 2]);
   assert.deepEqual(Object.keys(summary.counts), ["kylling", "ris", "hakkede-tomater", "hvidløg", "ingefær"]);
   // The fixed list worked, so empty recipe words don't stop the fetch; they become estimates.
@@ -128,11 +128,24 @@ test("recipes decide the extra search words; words Goma lacks are estimates and 
   const saved = db.prepare("SELECT value FROM meta WHERE key = 'candidates:2026-W43'").get() as { value: string };
   assert.deepEqual((JSON.parse(saved.value) as number[]).sort(), [1, 2]);
 
-  // Next week the words Goma lacked are not tried again, and a recipe lacking two prices is left out.
-  const twoMissing = recipe(3, ["chicken", "garlic", "ginger", "rice"]);
-  const nextWeek = await run(() => new Date("2026-10-30T12:00:00Z"), [...recipes, twoMissing]);
+  // Next week the words Goma lacked are not tried again, and a recipe needing only those is still a candidate.
+  const unpriced = recipe(3, ["chicken", "garlic", "ginger", "rice"]);
+  const nextWeek = await run(() => new Date("2026-10-30T12:00:00Z"), [...recipes, unpriced]);
   assert.deepEqual(Object.keys(nextWeek.counts), ["kylling", "ris", "hakkede-tomater"]);
-  assert.deepEqual(nextWeek.candidates.map((r) => r.id).sort(), [1, 2]);
+  assert.deepEqual(nextWeek.candidates.map((r) => r.id).sort(), [1, 2, 3]);
+});
+
+test("a diet variant Goma has no page for falls back to the plain word in the same run", async () => {
+  const db = openDb(":memory:");
+  const creamy: Recipe = {
+    id: 9, kind: "main", name: "Creamy Chicken", category: "Chicken", minutes: 30, servings: 4, rating: 5, reviews: 100,
+    ingredients: ["chicken", "heavy cream", "rice"], amounts: ["1", "1", "1"], steps: ["Cook.", "Serve."],
+    proteins: ["chicken"], gluten: [], dairy: ["heavy cream"],
+  };
+  const summary = await fetchWeek({
+    db, http: fakeHttp(NETTO_PAGES), household, items: ["kylling", "ris"], recipes: [creamy], rules: loadIngredientRules(), now: FRIDAY, log: () => {},
+  });
+  assert.deepEqual(Object.keys(summary.counts), ["kylling", "ris", "laktosefri-fløde", "fløde"]);
 });
 
 test("exactly half empty is still accepted", async () => {

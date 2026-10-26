@@ -28,7 +28,9 @@ mkdirSync(dirname(RECIPES_FILE), { recursive: true });
 const gz = gzipSync(JSON.stringify(recipes), { level: 9 });
 writeFileSync(RECIPES_FILE, gz);
 
-const count = (p: string) => recipes.filter((r) => r.proteins.includes(p as Recipe["proteins"][number])).length;
+const mains = recipes.filter((r) => r.kind === "main");
+const count = (p: string) => mains.filter((r) => r.proteins.includes(p as Recipe["proteins"][number])).length;
 console.log(`Læst: ${read} opskrifter. Gemt: ${recipes.length} (${(gz.length / 1e6).toFixed(1)} MB).`);
+console.log(`Hovedretter ${mains.length}, tilbehør ${recipes.length - mains.length}.`);
 console.log(`Kylling ${count("chicken")}, okse ${count("beef")}, svin ${count("pork")}, fisk ${count("fish")}, vegetar ${count("veg")}.`);
 console.log(`Uden gluten-ingredienser: ${recipes.filter((r) => !r.gluten.length).length}. Uden mælk: ${recipes.filter((r) => !r.dairy.length).length}. Uden begge: ${recipes.filter((r) => !r.gluten.length && !r.dairy.length).length}.`);

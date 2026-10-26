@@ -66,6 +66,10 @@ function fetchedText(iso) {
 
 const kr = (n) => `${n.toLocaleString("da-DK", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr.`;
 const krWhole = (n) => `${Math.round(n).toLocaleString("da-DK")} kr.`;
+/** "410 kr." or "410 kr. + 3 uden pris": lines without a price come on top. */
+const totalText = (plan) => `${krWhole(plan.totalPurchaseCost)}${plan.unpricedCount ? ` + ${plan.unpricedCount} uden pris` : ""}`;
+/** "18,40 kr. pr. portion", or "fra 18,40 kr." when some ingredients have no price. */
+const portionText = (dish) => `${dish.unpriced ? "fra " : ""}${kr(dish.pricePerPortion)} pr. portion`;
 
 function amount(qty, unit) {
   const n = (v) => v.toLocaleString("da-DK", { maximumFractionDigits: 2 });
@@ -425,7 +429,7 @@ function screenToday() {
       parts.push(`<section class="card pink stack">
         <div class="hero" style="height:120px">${icon("basket", "bob")}</div>
         <h1>Ny plan for uge ${weekNumber(next.week)} er klar</h1>
-        <p><span class="big">${krWhole(next.totalPurchaseCost)}</span> <span class="muted">af ${krWhole(next.weeklyBudgetDkk)}</span></p>
+        <p><span class="big">${krWhole(next.totalPurchaseCost)}</span> <span class="muted">${next.unpricedCount ? `+ ${next.unpricedCount} uden pris ` : ""}af ${krWhole(next.weeklyBudgetDkk)}</span></p>
         ${next.options ? `<a class="button" href="#/vaelg">Vælg retter</a>` : ""}
         <a class="button${next.options ? " secondary" : ""}" href="#/indkob">Se indkøbsliste</a>
       </section>`);
@@ -472,7 +476,7 @@ function screenToday() {
       ${done ? `<span class="stamp${party ? " landing" : ""}">Lavet!</span>` : ""}
       <p class="muted small">I dag, ${t.day} · ${meal.servings} portioner</p>
       <h1>${esc(meal.title)}</h1>
-      <p class="muted">${meal.timeMinutes} min · ${kr(meal.pricePerPortion)} pr. portion</p>
+      <p class="muted">${meal.timeMinutes} min · ${portionText(meal)}</p>
       <a class="button secondary" href="#/opskrift/${current.week}/${meal.day}">Se opskrift</a>
     </section>`);
     if (!done && current.days && !forgotten && !freezeAlerts.length) {
@@ -586,7 +590,7 @@ function screenWeek() {
       ${dayLabel}
       <span class="badge" style="background:var(--${tintFor(i)})">${icon(dishIcon(meal))}</span>
       <span class="main"><span class="item">${esc(meal.title)}</span>
-        <span class="meta"><span>${kr(meal.pricePerPortion)} pr. portion</span></span></span>
+        <span class="meta"><span>${portionText(meal)}</span></span></span>
       ${done ? `<span class="box" style="background:var(--mint);color:var(--ink)" aria-label="Lavet">✓</span>` : ""}
     </a>`;
   });
@@ -594,7 +598,7 @@ function screenWeek() {
   const dropped = (plan.dropped ?? []).map((id) => plan.options[id].title);
   return `${gear}<header class="stack">
       <p class="muted small">Uge ${weekNumber(plan.week)} · ${esc(plan.store)}${fetched ? ` · tilbud hentet ${fetchedText(fetched.fetchedAt)}` : ""}</p>
-      <p><span class="big">${krWhole(plan.totalPurchaseCost)}</span> <span class="muted">af ${krWhole(plan.weeklyBudgetDkk)}</span></p>
+      <p><span class="big">${krWhole(plan.totalPurchaseCost)}</span> <span class="muted">${plan.unpricedCount ? `+ ${plan.unpricedCount} uden pris ` : ""}af ${krWhole(plan.weeklyBudgetDkk)}</span></p>
       <div class="budget" role="img" aria-label="${krWhole(plan.totalPurchaseCost)} af ${krWhole(plan.weeklyBudgetDkk)}"><span style="width:${spent}%"></span></div>
       ${leftoverLine(plan)}
     </header>
@@ -801,14 +805,14 @@ function screenChoose() {
       <span class="badge" style="background:var(--${tintFor(i)})">${icon(dishIcon(dish))}</span>
       <span class="main"><span class="item">${esc(dish.title)}</span>
         <span class="meta"><span>${esc(dish.description)}</span></span>
-        <span class="meta"><span>${dish.timeMinutes} min · ${kr(dish.pricePerPortion)} pr. portion${dish.source ? ` · ${stars(dish.source.rating)}` : ""}</span>${dish.suggested ? `<span class="tag suggested">Forslag</span>` : ""}</span></span>
+        <span class="meta"><span>${dish.timeMinutes} min · ${portionText(dish)}${sourcesOf(dish)[0] ? ` · ${stars(sourcesOf(dish)[0].rating)}` : ""}</span>${dish.suggested ? `<span class="tag suggested">Forslag</span>` : ""}</span></span>
     </button>`;
   });
   return `${back}
     <header class="stack">
       <h1>Vælg ugens retter</h1>
       <p><span class="big">${plan.selected.length} af ${plan.dinnersPerWeek}</span>
-        <span class="muted">· ${krWhole(plan.totalPurchaseCost)} af ${krWhole(plan.weeklyBudgetDkk)}</span></p>
+        <span class="muted">· ${totalText(plan)} af ${krWhole(plan.weeklyBudgetDkk)}</span></p>
       ${leftoverLine(plan)}
       ${over ? `<p class="small muted">Over budget. Det er et mål, ikke en grænse.</p>` : ""}
     </header>
@@ -835,7 +839,7 @@ function screenRecipe(week, day) {
       <div class="hero" style="height:130px">${icon(dishIcon(meal))}</div>
       <p class="muted small">${meal.day[0].toUpperCase() + meal.day.slice(1)}</p>
       <h1>${esc(meal.title)}</h1>
-      <p class="muted">${meal.timeMinutes} min · ${meal.servings} portioner · ${kr(meal.pricePerPortion)} pr. portion</p>
+      <p class="muted">${meal.timeMinutes} min · ${meal.servings} portioner · ${portionText(meal)}</p>
       ${sourceLine(meal)}
     </header>
     <div class="section">
@@ -852,11 +856,15 @@ function screenRecipe(week, day) {
 
 const stars = (rating) => `${rating.toLocaleString("da-DK", { maximumFractionDigits: 1 })} ★`;
 
-/** Where the recipe comes from and what people thought of it. Dishes Claude wrote itself have none. */
+/** The Food.com recipes behind a dish: its main and its side. Plans from before sides had one "source". */
+const sourcesOf = (dish) => dish.sources ?? (dish.source ? [dish.source] : []);
+
+/** Where the recipes come from and what people thought of them. Dishes Claude wrote itself have none. */
 function sourceLine(dish) {
-  const s = dish.source;
-  if (!s) return "";
-  return `<p class="small muted">Efter <a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.name)}</a> fra Food.com · ${stars(s.rating)} (${s.reviews.toLocaleString("da-DK")} anmeldelser)</p>`;
+  const parts = sourcesOf(dish).map((s) =>
+    `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.name)}</a> (${stars(s.rating)}, ${s.reviews.toLocaleString("da-DK")} anmeldelser)`);
+  if (!parts.length) return "";
+  return `<p class="small muted">Efter ${parts.join(" og ")} fra Food.com</p>`;
 }
 
 /** "Lavet" belongs to this week's dishes up to today, not to days still ahead. */
@@ -869,15 +877,16 @@ function shoppingRow(plan, line, checked) {
   const tags = [
     line.priceSource === "offer" ? `<span class="tag offer">Tilbud</span>` : "",
     line.priceSource === "estimate" ? `<span class="tag estimate">Skøn</span>` : "",
+    line.priceSource === "unknown" ? `<span class="tag estimate">Pris ukendt</span>` : "",
     line.checkLabel ? `<span class="tag label">Tjek varedeklarationen</span>` : "",
     line.buyEarly ? `<span class="tag early">Senest ${weekdayOf(line.buyBefore)}</span>` : "",
   ].join("");
-  const price = `${line.priceSource === "estimate" ? "ca. " : ""}${kr(line.price)}`;
+  const price = line.priceSource === "unknown" ? "" : `${line.priceSource === "estimate" ? "ca. " : ""}${kr(line.price)}`;
   const pop = checked && (celebrating("tick", line.productId) || celebrating("tick", "all"));
   return `<button class="row${checked ? " checked" : ""}${pop ? " pop" : ""}" data-action="tick" data-plan="${plan.id}" data-key="${esc(line.productId)}" aria-pressed="${checked}">
     <span class="box" aria-hidden="true">${checked ? "✓" : ""}</span>
     ${icon(iconName(line.item) ?? SECTION_ICON[line.section])}
-    <span class="main"><span class="item">${line.packages} × ${esc(line.item)}</span>
+    <span class="main"><span class="item">${line.priceSource === "unknown" ? "" : `${line.packages} × `}${esc(line.item)}</span>
       <span class="meta"><span>${esc(line.packageSize)}</span>${tags}</span></span>
     <span class="side">${price}</span>
   </button>`;
@@ -915,7 +924,7 @@ function screenShopping() {
 
   return `<header class="stack">
       <p class="muted small">Uge ${weekNumber(plan.week)} · ${esc(plan.store)} · ${waiting ? "gemmes, når der er forbindelse" : "alt er gemt"}</p>
-      <p><span class="big">${done.length} af ${lines.length}</span> <span class="muted">· ${krWhole(plan.totalPurchaseCost)} i alt</span></p>
+      <p><span class="big">${done.length} af ${lines.length}</span> <span class="muted">· ${totalText(plan)} i alt</span></p>
       ${plan.buyNote ? `<p class="notice">${esc(plan.buyNote)}</p>` : ""}
     </header>
     ${open.length ? groups.join("") : basketParty(celebration?.kind === "tick" && Date.now() < celebration.until)}

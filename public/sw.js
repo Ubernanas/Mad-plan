@@ -2,7 +2,7 @@
 // kept on the phone by app.js, so this only caches the page files.
 
 // Bump on every change to the page files, so open pages reload with the new version (see app.js).
-const CACHE = "madplan-v9";
+const CACHE = "madplan-v10";
 const FILES = ["/", "/app.css", "/app.js", "/fonts/fredoka-500.woff2", "/fonts/fredoka-600.woff2", "/fonts/nunito-600.woff2", "/fonts/nunito-700.woff2", "/fonts/nunito-800.woff2"];
 
 self.addEventListener("install", (event) => {

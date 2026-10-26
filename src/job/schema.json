@@ -95,9 +95,25 @@
                 },
                 "kitchenItem": {
                   "type": "string"
+                },
+                "buy": {
+                  "type": "boolean"
+                },
+                "section": {
+                  "type": "string",
+                  "enum": [
+                    "frugt og grønt",
+                    "kød og fisk",
+                    "køl",
+                    "kolonial",
+                    "frost"
+                  ]
                 }
               }
             }
+          },
+          "sideRecipeId": {
+            "type": "integer"
           }
         }
       }

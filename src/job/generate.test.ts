@@ -5,7 +5,7 @@ import { openDb, setMeta, type DB } from "../db.ts";
 import { listKitchen, replaceKitchen } from "../kitchen.ts";
 import type { Recipe } from "../recipes.ts";
 import type { ClaudeResponse } from "./compute.ts";
-import { buildPrompt, generatePlan, jobEnv, loadProducts, minRecipeDishes, parseClaudeOutput, PlanError, validateResponse, type RunClaude } from "./generate.ts";
+import { buildPrompt, generatePlan, jobEnv, loadProducts, parseClaudeOutput, PlanError, validateResponse, type RunClaude } from "./generate.ts";
 
 const FRIDAY = () => new Date("2026-10-23T12:00:00Z"); // plan week 2026-W43
 const SECTIONS: Record<string, Section> = { ris: "kolonial", kylling: "kød og fisk" };
@@ -76,26 +76,34 @@ test("a valid answer is computed and saved as the week's plan", async () => {
 });
 
 const bourbon: Recipe = {
-  id: 1, name: "Bourbon Chicken", category: "Chicken Breast", minutes: 35, servings: 4, rating: 5, reviews: 3063,
+  id: 1, kind: "main", name: "Bourbon Chicken", category: "Chicken Breast", minutes: 35, servings: 4, rating: 5, reviews: 3063,
   ingredients: ["chicken breasts", "soy sauce", "rice"], amounts: ["2", "1/3", "1"], steps: ["Fry.", "Simmer."],
   proteins: ["chicken"], gluten: ["soy sauce"], dairy: [],
 };
+const lemonPotatoes: Recipe = {
+  ...bourbon, id: 2, kind: "side", name: "Greek Lemon Potatoes", rating: 4.8, reviews: 120, proteins: [], gluten: [],
+  ingredients: ["potatoes", "lemon", "olive oil"],
+};
 
-test("the week's recipes are sent to Claude, and the dishes made from them credit Food.com", async () => {
+test("the week's mains and sides are sent to Claude, and a dinner credits both", async () => {
   const db = openDb(":memory:");
   seed(db);
-  setMeta(db, "candidates:2026-W43", "[1]");
+  setMeta(db, "candidates:2026-W43", "[1,2]");
   const answer = good();
   answer.dishes[1]!.recipeId = 1;
+  answer.dishes[1]!.sideRecipeId = 2;
   const run = claudeSays(answer);
-  const { plan } = await generatePlan({ ...options(db, run), recipes: [bourbon] });
+  const { plan } = await generatePlan({ ...options(db, run), recipes: [bourbon, lemonPotatoes] });
 
   const sent = JSON.parse(run.inputs[0]!).recipes;
-  assert.deepEqual(sent.map((r: Recipe) => r.name), ["Bourbon Chicken"]);
+  assert.deepEqual(sent.map((r: Recipe) => `${r.kind}: ${r.name}`), ["main: Bourbon Chicken", "side: Greek Lemon Potatoes"]);
   assert.deepEqual(sent[0].gluten, ["soy sauce"]);
-  assert.match(run.prompts[0]!, /blandt de 1 opskrifter/);
-  assert.deepEqual(plan.options[1]!.source, { name: "Bourbon Chicken", rating: 5, reviews: 3063, url: "https://www.food.com/recipe/1" });
-  assert.equal(plan.options[0]!.source, undefined); // written by Claude itself
+  assert.match(run.prompts[0]!, /hovedret og et tilbehør fra recipes/);
+  assert.deepEqual(plan.options[1]!.sources, [
+    { name: "Bourbon Chicken", rating: 5, reviews: 3063, url: "https://www.food.com/recipe/1" },
+    { name: "Greek Lemon Potatoes", rating: 4.8, reviews: 120, url: "https://www.food.com/recipe/2" },
+  ]);
+  assert.equal(plan.options[0]!.sources, undefined); // written by Claude itself
 });
 
 test("a week without candidates sends no recipes and does not ask for them", async () => {
@@ -104,18 +112,21 @@ test("a week without candidates sends no recipes and does not ask for them", asy
   const run = claudeSays(good());
   await generatePlan({ ...options(db, run), recipes: [bourbon] });
   assert.deepEqual(JSON.parse(run.inputs[0]!).recipes, []);
-  assert.doesNotMatch(run.prompts[0]!, /opskrifter i recipes/);
+  assert.doesNotMatch(run.prompts[0]!, /fra recipes/);
 });
 
-test("recipeId must be one of the week's recipes, and each recipe is used once", () => {
+test("recipeId must be a main and sideRecipeId a side from the week's recipes; each main is used once", () => {
   const products = loadProducts(seededDb(), "2026-W43", "Netto", []);
+  const recipes = new Map([[1, bourbon], [2, lemonPotatoes]]);
   const answer = good();
   answer.dishes[0]!.recipeId = 1;
   answer.dishes[1]!.recipeId = 1;
-  answer.dishes[2]!.recipeId = 99;
-  const errors = validateResponse(answer, products, household, { items: [] }, new Map([[1, bourbon]]));
-  assert.ok(errors.includes("recipeId 99 findes ikke i recipes."), errors.join("\n"));
+  answer.dishes[2]!.recipeId = 2;
+  answer.dishes[2]!.sideRecipeId = 1;
+  const errors = validateResponse(answer, products, household, { items: [] }, recipes);
+  assert.ok(errors.includes("recipeId 2 er ikke en hovedret i recipes."), errors.join("\n"));
   assert.ok(errors.some((e) => e.startsWith("To retter har samme recipeId")), errors.join("\n"));
+  assert.ok(errors.some((e) => e.endsWith("sideRecipeId 1 er ikke et tilbehør i recipes.")), errors.join("\n"));
 });
 
 test("a dish may not swap its recipe's protein: shrimp made with chicken loses the recipe", () => {
@@ -140,22 +151,24 @@ test("the recipe's protein may come from the kitchen", () => {
   assert.deepEqual(validateResponse(answer, products, household, kitchen, new Map([[8, burger]])), []);
 });
 
-test("all but 2 dishes come from the recipes, when there are enough of them", () => {
-  assert.equal(minRecipeDishes(12, 40), 10);
-  assert.equal(minRecipeDishes(12, 12), 10);
-  assert.equal(minRecipeDishes(12, 11), 0); // a thin week: Claude may write more itself
-  assert.equal(minRecipeDishes(2, 40), 0);
+test("an ingredient without a product is bought anyway, on the list as \"pris ukendt\"", async () => {
+  const db = openDb(":memory:");
+  seed(db);
+  const answer = good();
+  for (const dish of answer.dishes) dish.ingredients.push({ name: "lime", qty: 1, unit: "stk", buy: true, section: "frugt og grønt", checkLabel: false });
+  answer.dishes[0]!.ingredients.push({ name: "feta", qty: 100, unit: "g", buy: true, checkLabel: false });
+  const products = loadProducts(db, "2026-W43", "Netto", []);
+  assert.ok(validateResponse(answer, products, household).some((e) => e.includes("feta: en vare med buy skal have section")));
 
-  const products = loadProducts(seededDb(), "2026-W43", "Netto", []);
-  const three = new Map([1, 2, 3].map((id) => [id, { ...bourbon, id }] as const));
-  const answer = good(); // 3 dishes, none from the recipes
-  assert.ok(validateResponse(answer, products, household, { items: [] }, three)
-    .includes("Kun 0 retter kommer fra recipes. Mindst 1 af de 3 retter skal være opskrifter fra recipes med recipeId."));
-  answer.dishes[0]!.recipeId = 1;
-  assert.deepEqual(validateResponse(answer, products, household, { items: [] }, three), []);
-
-  assert.match(buildPrompt("2026-W45", "Netto", { ...household, dishOptions: 12 }, "", 40), /Mindst 10 af de 12 retter skal komme fra recipes/);
-  assert.doesNotMatch(buildPrompt("2026-W45", "Netto", { ...household, dishOptions: 12 }, "", 8), /Mindst/);
+  answer.dishes[0]!.ingredients.pop();
+  const { plan } = await generatePlan(options(db, claudeSays(answer)));
+  const lime = plan.shoppingList.find((l) => l.item === "Lime")!;
+  // One lime for each of the 2 chosen dishes, on one line without a price.
+  assert.deepEqual([lime.priceSource, lime.price, lime.packageSize, lime.section], ["unknown", 0, "2 stk", "frugt og grønt"]);
+  assert.equal(plan.unpricedCount, 1);
+  assert.equal(plan.totalPurchaseCost, 20 + 40 + 10);
+  assert.equal(plan.options[1]!.unpriced, 1);
+  assert.equal(plan.leftovers.some((l) => l.item === "Lime"), false);
 });
 
 test("every dish is a whole dinner: protein, a filling side and vegetables", () => {
@@ -187,7 +200,7 @@ test("ketchup is not a vegetable, but potatoes and rice from the kitchen are a s
   ];
   const kitchen = { items: [{ id: 1, name: "Kartofler", qty: 1000, unit: "g" as const, location: "skab" as const, expires: null, productId: null, source: null }] };
   const errors = validateResponse(answer, products, household, kitchen);
-  assert.deepEqual(errors, [`${answer.dishes[0]!.title}: retten mangler grønt (grøntsager eller salat; løg, hvidløg og krydderurter tæller ikke). Tilføj det fra products, og skriv trinene til det.`]);
+  assert.deepEqual(errors, [`${answer.dishes[0]!.title}: retten mangler grønt (grøntsager eller salat; løg, hvidløg og krydderurter tæller ikke). Tilføj et tilbehør fra recipes eller et enkelt tilbehør, og skriv trinene til det.`]);
 });
 
 function seededDb() {

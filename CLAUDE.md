@@ -4,9 +4,9 @@ Personligt system, der hver uge henter tilbud fra de butikker, vi handler i, og 
 
 ## Hvad det gør (når alle faser er bygget)
 
-1. **Søndag kl. 14 (Europe/Copenhagen)** henter koden ugens tilbud og priser fra Goma og gemmer dem i SQLite. Ud fra proteintilbuddene vælger den ca. 40 opskrifter fra Food.com-datasættet, og deres ingredienser bestemmer, hvilke varer der hentes.
+1. **Søndag kl. 14 (Europe/Copenhagen)** henter koden ugens tilbud og priser fra Goma og gemmer dem i SQLite. Den vælger de bedst bedømte hovedretter og tilbehør fra Food.com-datasættet (proteiner på tilbud får flere pladser), og deres ingredienser bestemmer, hvilke varer der hentes.
 2. **Valgfrit (P3):** mellem kl. 14 og 18 kan vi rette, hvad vi har i køkkenet, og trykke "Lav planen".
-3. **Søndag kl. 18** laves planen automatisk, hvis den ikke allerede er lavet. `claude -p` vælger `dishOptions` retter (standard 12) blandt opskrifterne, oversætter og tilpasser dem og anbefaler `dinnersPerWeek` af dem. Koden bygger indkøbslisten og regner alle priser ud.
+3. **Søndag kl. 18** laves planen automatisk, hvis den ikke allerede er lavet. `claude -p` sætter `dishOptions` aftensmåltider (standard 12) sammen af en hovedret og et tilbehør, oversætter og tilpasser dem og anbefaler `dinnersPerWeek` af dem. Koden bygger indkøbslisten og regner alle priser ud.
 4. Planen vises på en mobilvenlig webside med ugens retter og en indkøbsliste, vi begge kan krydse af. Claudes anbefalede retter er valgt på forhånd, men vi kan selv vælge andre blandt forslagene.
 
 ## Faser
@@ -41,7 +41,7 @@ Byg én fase ad gangen. Gå først videre, når fasen har kørt et par søndage.
 
 ### Efter P3: opskrifter fra Food.com
 
-Claudes egne opskrifter var for kedelige (ingen saucer, lidt sjæl), så retterne kommer nu fra rigtige, bedømte opskrifter. Se "Opskrifterne" nedenfor.
+Claudes egne opskrifter var for kedelige (ingen saucer, lidt sjæl), så retterne kommer nu fra rigtige, bedømte opskrifter. Systemet er **måltid først**: gode, hele aftensmåltider vælges først, tilbud er et hensyn, og en ingrediens uden pris kommer på listen som "pris ukendt" i stedet for at udelukke retten. Se "Opskrifterne" nedenfor.
 
 ### Ikke i nogen fase
 
@@ -97,7 +97,7 @@ Godkendelse sker med `CLAUDE_CODE_OAUTH_TOKEN`, et 1-årigt token lavet lokalt m
 
 - `input.json` indeholder ugens produkter fra den valgte butik (`id`, `name`, `packageAmount`, `unit`, `price`, `onOffer`, `perKg`), præferencer, ønsker til ugen (`wishes`) og kosthensyn. Fra P3 også køkkenbeholdningen. Og ugens opskrifter (`recipes`) på engelsk, som søndagens hentning valgte.
 - Claude må kun bruge produkter fra `input.json`, basisvarer og (fra P3) køkkenvarer.
-- Læs `structured_output`, og valider: hver `productId` findes, mængderne er positive, enheden passer til produktet, der er præcis `dishOptions` forskellige retter, og præcis `dinnersPerWeek` har `suggested: true`. Hver `recipeId` er en af ugens opskrifter og bruges højst én gang, og retten har opskriftens protein (købt eller fra køkkenet). Er der mindst `dishOptions` opskrifter, skal alle retter undtagen 2 have `recipeId` (10 af 12). Ved fejl prøves én gang til. Fejler det igen, logges fejlen, og den forrige plan bliver stående.
+- Læs `structured_output`, og valider: hver `productId` findes, mængderne er positive, enheden passer til produktet, der er præcis `dishOptions` forskellige retter, og præcis `dinnersPerWeek` har `suggested: true`. Hver `recipeId` er en af ugens hovedretter og bruges højst én gang, og retten har opskriftens protein (købt, fra køkkenet eller med `buy`); `sideRecipeId` er et af ugens tilbehør. Hver ret har protein, mættende tilbehør og grønt. En vare med `buy` har en `section`. Ved fejl prøves én gang til. Fejler det igen, logges fejlen, og den forrige plan bliver stående.
 - Exit code ≠ 0 eller fejltekst om login: log "token udløbet eller ugyldigt". Tokenet fornyes en gang om året. Udløbsdatoen står i `config/household.json`.
 - Planen laves højst et par gange om ugen. Forbruget tæller med i Pro-grænserne.
 
@@ -107,18 +107,19 @@ Godkendelse sker med `CLAUDE_CODE_OAUTH_TOKEN`, et 1-årigt token lavet lokalt m
 
 - `storeReason`: kort begrundelse for butikken
 - `dietRespected[]`: hvilke kosthensyn planen overholder
-- `dishes[]`: `title`, `description` (én sætning til valget), `suggested`, `servings`, `timeMinutes`, `steps[]`, `recipeId` (Food.com-opskriftens id; mangler, hvis Claude selv skrev retten) og `ingredients[]` med:
+- `dishes[]`: `title`, `description` (én sætning til valget), `suggested`, `servings`, `timeMinutes`, `steps[]`, `recipeId` (Food.com-hovedrettens id; mangler, hvis Claude selv skrev retten), `sideRecipeId` (Food.com-tilbehørets id; mangler ved et enkelt tilbehør som kogte kartofler) og `ingredients[]` med:
   - retterne står i den rækkefølge, de bør laves i; de valgte får dagene fra mandag i den rækkefølge
   - `name`, `qty`, `unit` (`g`, `ml` eller `stk`)
-  - præcis én kilde: `productId` (fra `input.json`), `kitchenItem` (P3) eller `basis: true`
+  - præcis én kilde: `productId` (fra `input.json`), `kitchenItem` (P3), `basis: true`, eller `buy: true` med `section` for en vare uden pris
   - `checkLabel`: true for varer, hvor allergener ofte gemmer sig (bouillon, saucer, krydderiblandinger, færdigretter, pålæg)
 - `notes[]`
 
 ### Det koden beregner (`compute.ts`)
 
-- `shoppingList[]`: én linje pr. produkt med `section`, `item`, `packageSize`, `packages`, `price`, `priceSource`, `checkLabel`, og fra P2 `buyBefore`
+- `shoppingList[]`: én linje pr. produkt (og pr. vare uden pris) med `section`, `item`, `packageSize`, `packages`, `price`, `priceSource`, `checkLabel`, og fra P2 `buyBefore`
 - `totalPurchaseCost`, og pr. ret `mealCost` og `pricePerPortion`
-- pr. ret med `recipeId`: `source` (opskriftens navn, stjerner, antal anmeldelser og link), som opskriftssiden viser. Claude skriver den aldrig
+- pr. ret: `sources[]` (hovedret og tilbehør fra Food.com med navn, stjerner, anmeldelser og link), som opskriftssiden viser, og `unpriced` (antal varer uden pris). Claude skriver dem aldrig
+- `unpricedCount`: linjer på indkøbslisten uden pris
 - `options[]` (alle forslag med pris), `selected[]` (de valgte), `meals[]` (de valgte med dag) og `products` (et øjebliksbillede af de brugte varer). Vælger vi andre retter, regnes planen om ud fra disse felter alene (`selectDishes`), uden Claude og uden databasen.
 - P2: `leftovers[]` og `leftoverValue`
 
@@ -152,10 +153,10 @@ Der findes ikke et åbent API for danske tilbudsaviser. Gomas Data API kræver e
 
 ### Søgeord fra opskrifterne
 
-- Besparelsen på proteintilbuddene i den valgte butik afgør, hvilke 200 opskrifter der vælges (mange mangler pris på noget, så puljen er stor): flest med proteinerne på tilbud, men nogle af hver slags. Gode bedømmelser, mange anmeldelser og kort tid trækker op; opskrifter fra de sidste 4 ugers planer og opskrifter med for mange gluten- eller laktose-ombytninger er ude.
+- 40 hovedretter og 30 tilbehør vælges efter bedømmelse, antal anmeldelser og tid; opskrifter fra de sidste 4 ugers planer og opskrifter med for mange gluten- eller laktose-ombytninger er ude. Besparelsen på proteintilbuddene i den valgte butik giver proteinerne på tilbud flere af hovedretterne, men nogle af hver slags. Tilbehøret er højst 4 pr. kategori, så der er kartofler, ris, salater og grønt at parre med. Om ingredienserne har en pris, spiller ingen rolle for valget.
 - `config/ingredients.json` oversætter deres engelske ingredienser til Goma-søgeord (med glutenfri og laktosefri varianter) eller basisvarer. Første match vinder, så sammensatte ord står først.
-- Søgeord uden en pris fra de sidste 4 uger hentes først, derefter dem, flest opskrifter bruger, til siderne er brugt (24 i alt). Resten prissættes fra tidligere uger som skøn. Gav et ord 0 varer, springes det over i 8 uger.
-- De højst 40 opskrifter, der mangler pris på højst én ingrediens, og aldrig på kød, fisk eller bønner, gemmes i `meta` som `candidates:<uge>` til Claude.
+- Søgeord uden en pris fra de sidste 4 uger hentes først, derefter dem, flest opskrifter bruger, til siderne er brugt (24 i alt). Resten prissættes fra tidligere uger som skøn, eller får ingen pris. Gav et ord 0 varer, springes det over i 8 uger. Har Goma ingen side for en kostvariant (`laktosefri-fløde`), hentes det almindelige ord (`fløde`) i stedet, for dets side viser også varianterne.
+- Opskrifterne gemmes i `meta` som `candidates:<uge>` til Claude.
 
 ### Høflighed
 
@@ -173,7 +174,7 @@ Giver en proteinsøgning 0 rækker, eller giver over halvdelen af den faste list
 
 - `dinnersPerWeek` aftensmåltider (standard 7, mandag-søndag) til `persons` personer, med rester til frokost hvor det giver mening.
 - Basisvarer (olie, salt, peber, tørre krydderier, eddike, sukker, vand) står ikke på indkøbslisten.
-- Retterne kommer fra Food.com-opskrifterne (se "Opskrifterne"). Claude skriver kun selv en ret, når for få opskrifter passer. Hent aldrig opskrifter fra andre sider.
+- Retterne kommer fra Food.com-opskrifterne (se "Opskrifterne"). Claude skriver kun selv en ret, når ingen opskrift passer, fx til et ønske. Hent aldrig opskrifter fra andre sider.
 - Retter, der deler ingredienser, foretrækkes, så hele pakninger bliver brugt.
 - Indkøbslisten er grupperet efter afdeling og tænkt til 1-2 store indkøb om ugen.
 - **Budget:** `weeklyBudgetDkk` er et mål, ikke en grænse. Claude skal sigte efter det. Siden viser indkøbsprisen ved siden af budgettet, men en plan over budget afvises ikke.
@@ -181,9 +182,10 @@ Giver en proteinsøgning 0 rækker, eller giver over halvdelen af den faste list
 ### Opskrifterne
 
 - Kilden er Kaggle-datasættet "Food.com - Recipes and Reviews" (irkaal, CC0, 522.517 opskrifter). Det hentes i hånden som `datasets/recipes.csv`; `npm run import-recipes` filtrerer det til `recipes/foodcom.json.gz`.
-- Filteret: mindst 4,5 stjerner og 10 anmeldelser, højst 75 minutter, 4-16 ingredienser, 2-14 trin, et protein, og ingen desserter, brød, drikke, morgenmad, tilbehør, marinader, dips eller saucer. Ved samme navn beholdes den med flest anmeldelser.
+- Filteret: mindst 4,5 stjerner og 10 anmeldelser, og ingen desserter, brød, drikke, morgenmad, supper som tilbehør, marinader, dips eller saucer. Ved samme navn beholdes den med flest anmeldelser.
+- `kind`: `main` (et protein, højst 75 minutter, 4-16 ingredienser, 2-14 trin) eller `side` (kartofler, ris, salat, grønt uden eget kød, højst 60 minutter, 2-16 ingredienser). Pølser og kartofler er en hovedret; bacon i en kartoffelsalat er tilbehør.
 - Datasættet har mistet enhederne ("1/2", ikke "1/2 cup"), og mængderne passer ikke altid til ingredienserne. Begge lister gemmes, som de er, og Claude læser enhederne ud af trinene.
-- Claude oversætter til dansk og metrisk, skalerer, laver glutenfri og laktosefri varianter og bevarer saucer og krydderier. Opskriftens protein byttes aldrig (rejer med kylling er en anden ret); laks for anden fisk er i orden. Claude skriver højst 2 retter selv, når der er opskrifter nok. Hver ret er en hel aftensmad med protein, mættende tilbehør og grønt; beskriver opskriften kun hovedkomponenten, tilføjer Claude tilbehør og grønt, og valideringen afviser retter uden. Siden viser "Efter <navn> fra Food.com · 4,8 ★ (123 anmeldelser)".
+- Claude oversætter til dansk og metrisk, skalerer, laver glutenfri og laktosefri varianter og bevarer saucer og krydderier. Opskriftens protein byttes aldrig (rejer med kylling er en anden ret); laks for anden fisk er i orden. Hver ret er en hel aftensmad: en hovedret og et tilbehør fra Food.com eller et enkelt tilbehør (kogte kartofler, ris, grøn salat), så der er protein, noget mættende og grønt. Valideringen afviser retter uden. Mangler en vare i `products`, sættes den på med `buy` i stedet for at ændre retten. Siden viser "Efter Chicken Souvlaki (5 ★, 85 anmeldelser) og Greek Lemon Potatoes (4,8 ★, 120 anmeldelser) fra Food.com".
 
 ### Kosthensyn
 
@@ -194,9 +196,9 @@ Giver en proteinsøgning 0 rækker, eller giver over halvdelen af den faste list
 
 ## Priser
 
-- **Indkøbspris** (`totalPurchaseCost`): hvad der betales ved kassen, summen af hele pakninger. Køber vi 1 kg ris og bruger 300 g, tæller hele pakken.
+- **Indkøbspris** (`totalPurchaseCost`): hvad der betales ved kassen, summen af hele pakninger. Køber vi 1 kg ris og bruger 300 g, tæller hele pakken. Varer uden pris kommer oveni og vises som "410 kr. + 3 uden pris".
 - **Portionspris** (`pricePerPortion`): prisen for den mængde, retten bruger, delt med antal portioner.
-- **`priceSource`** pr. vare: `"offer"` (tilbud fra Goma), `"regular"` (normalpris fra Goma) eller `"estimate"` (kunne ikke hentes, vises med "ca.").
+- **`priceSource`** pr. vare: `"offer"` (tilbud fra Goma), `"regular"` (normalpris fra Goma) `"estimate"` (kunne ikke hentes, vises med "ca.") eller `"unknown"` (ingen vare med pris, vises med "pris ukendt"; portionsprisen vises da som "fra …").
 
 ## P2: rester, buffer og dagstatus
 

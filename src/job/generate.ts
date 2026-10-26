@@ -6,7 +6,7 @@ import { spawn } from "node:child_process";
 import { mkdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Household, Section } from "../config.ts";
+import { SECTIONS, type Household, type Section } from "../config.ts";
 import { getMeta, type DB } from "../db.ts";
 import type { Unit } from "../fetch/size.ts";
 import type { LeafletInfo } from "../fetch/validity.ts";
@@ -74,10 +74,10 @@ export async function generatePlan({
       ? { kitchenText: kitchen.text }
       : { kitchen: kitchen.items.map((i) => ({ id: `k${i.id}`, name: i.name, qty: i.qty, unit: i.unit, location: i.location, expires: i.expires })) }),
     products: [...products.values()].map(({ query, estimate, ...p }) => (estimate ? { ...p, estimate } : p)),
-    recipes: [...candidates.values()].map(({ id, name, minutes, servings, rating, reviews, ingredients, amounts, steps, gluten, dairy }) =>
-      ({ id, name, minutes, servings, rating, reviews, ingredients, amounts, steps, gluten, dairy })),
+    recipes: [...candidates.values()].map(({ id, kind, name, minutes, servings, rating, reviews, ingredients, amounts, steps, gluten, dairy }) =>
+      ({ id, kind, name, minutes, servings, rating, reviews, ingredients, amounts, steps, gluten, dairy })),
   });
-  const prompt = buildPrompt(week, fetch.store, household, wishes, candidates.size);
+  const prompt = buildPrompt(week, fetch.store, household, wishes, candidates.size > 0);
 
   let errors: string[] = [];
   for (let attempt = 1; attempt <= 2; attempt++) {
@@ -91,8 +91,8 @@ export async function generatePlan({
     if (errors.length === 0 && "response" in parsed) {
       const response = parsed.response as ClaudeResponse;
       for (const dish of response.dishes) {
-        const recipe = dish.recipeId === undefined ? undefined : candidates.get(dish.recipeId);
-        if (recipe) dish.source = { name: recipe.name, rating: recipe.rating, reviews: recipe.reviews, url: `https://www.food.com/recipe/${recipe.id}` };
+        const used = [dish.recipeId, dish.sideRecipeId].flatMap((id) => (id === undefined || !candidates.has(id) ? [] : [candidates.get(id)!]));
+        if (used.length) dish.sources = used.map((r) => ({ name: r.name, rating: r.rating, reviews: r.reviews, url: `https://www.food.com/recipe/${r.id}` }));
       }
       const createdAt = now().toISOString();
       if ("text" in kitchen) useConvertedKitchen(db, response, today);
@@ -125,15 +125,6 @@ function useConvertedKitchen(db: DB, response: ClaudeResponse, today: string): v
   }
 }
 
-/**
- * How many dishes must come from the week's recipes: all but 2 (10 of 12), so Claude
- * can still meet a wish or use the kitchen. Only when there are at least as many
- * recipes as dishes; in a thin week Claude may write more itself.
- */
-export function minRecipeDishes(dishOptions: number, candidates: number): number {
-  return candidates >= dishOptions ? Math.max(0, dishOptions - 2) : 0;
-}
-
 /** The recipes Sunday's fetch chose for Claude, by id. Empty for weeks fetched before there were recipes. */
 export function loadCandidates(db: DB, week: string, recipes?: Recipe[]): Map<number, Recipe> {
   const ids = JSON.parse(getMeta(db, `candidates:${week}`) ?? "[]") as number[];
@@ -164,7 +155,7 @@ export function loadProducts(db: DB, week: string, store: string, missing: strin
   return products;
 }
 
-export function buildPrompt(week: string, store: string, household: Household, wishes = "", recipes = 0): string {
+export function buildPrompt(week: string, store: string, household: Household, wishes = "", hasRecipes = false): string {
   const monday = mondayOf(week);
   const sunday = new Date(monday.getTime() + 6 * 86_400_000);
   const date = (d: Date) => d.toLocaleDateString("da-DK", { day: "numeric", month: "long", timeZone: "UTC" });
@@ -179,8 +170,7 @@ export function buildPrompt(week: string, store: string, household: Household, w
     `Kosthensyn: ${diet.length ? diet.join(", ") : "ingen"}.`,
     `Foreslå ${household.dishOptions} retter, og markér de ${household.dinnersPerWeek}, du anbefaler, til ${household.persons} personer. Budget: ca. ${household.weeklyBudgetDkk} kr.`,
     wishes.trim() ? `Ønsker til ugen: ${wishes.trim()}` : "",
-    recipes ? `Vælg retterne blandt de ${recipes} opskrifter i recipes, og skriv kun selv en ret, hvis for få af dem passer.` : "",
-    minRecipeDishes(household.dishOptions, recipes) ? `Mindst ${minRecipeDishes(household.dishOptions, recipes)} af de ${household.dishOptions} retter skal komme fra recipes.` : "",
+    hasRecipes ? "Sæt hver aftensmad sammen af en hovedret og et tilbehør fra recipes." : "",
     "Varer, præferencer, ønsker og kosthensyn står i JSON på stdin.",
   ].filter(Boolean).join("\n");
 }
@@ -218,11 +208,14 @@ export function validateResponse(
   const { dishes } = response;
 
   const recipeIds = dishes.flatMap((d) => (d.recipeId === undefined ? [] : [d.recipeId]));
-  for (const id of recipeIds) if (!recipes.has(id)) errors.push(`recipeId ${id} findes ikke i recipes.`);
-  if (new Set(recipeIds).size !== recipeIds.length) errors.push("To retter har samme recipeId. Hver opskrift må kun bruges én gang.");
-  const required = minRecipeDishes(household.dishOptions, recipes.size);
-  if (recipeIds.length < required) {
-    errors.push(`Kun ${recipeIds.length} retter kommer fra recipes. Mindst ${required} af de ${household.dishOptions} retter skal være opskrifter fra recipes med recipeId.`);
+  for (const id of recipeIds) {
+    if (recipes.get(id)?.kind !== "main") errors.push(`recipeId ${id} er ikke en hovedret i recipes.`);
+  }
+  if (new Set(recipeIds).size !== recipeIds.length) errors.push("To retter har samme recipeId. Hver hovedret må kun bruges én gang.");
+  for (const dish of dishes) {
+    if (dish.sideRecipeId !== undefined && recipes.get(dish.sideRecipeId)?.kind !== "side") {
+      errors.push(`${dish.title}: sideRecipeId ${dish.sideRecipeId} er ikke et tilbehør i recipes.`);
+    }
   }
 
   // Shrimp made with chicken is another dish than the one people rated; it may not carry the credit.
@@ -256,10 +249,10 @@ export function validateResponse(
       errors.push(`${dish.title}: retten mangler protein (kød, fisk, æg eller bønner).`);
     }
     if (!parts.has("starch")) {
-      errors.push(`${dish.title}: retten mangler mættende tilbehør (kartofler, ris, pasta, brød …). Tilføj det fra products, og skriv trinene til det.`);
+      errors.push(`${dish.title}: retten mangler mættende tilbehør (kartofler, ris, pasta, brød …). Tilføj et tilbehør fra recipes eller et enkelt tilbehør, og skriv trinene til det.`);
     }
     if (!parts.has("vegetable")) {
-      errors.push(`${dish.title}: retten mangler grønt (grøntsager eller salat; løg, hvidløg og krydderurter tæller ikke). Tilføj det fra products, og skriv trinene til det.`);
+      errors.push(`${dish.title}: retten mangler grønt (grøntsager eller salat; løg, hvidløg og krydderurter tæller ikke). Tilføj et tilbehør fra recipes eller et enkelt tilbehør, og skriv trinene til det.`);
     }
   }
 
@@ -286,9 +279,13 @@ export function validateResponse(
       const hasProduct = ing.productId !== undefined;
       const fromKitchen = ing.kitchenItem !== undefined;
       const isBasis = ing.basis === true;
-      if ([hasProduct, fromKitchen, isBasis].filter(Boolean).length !== 1) {
-        errors.push(`${label}: skal have præcis én kilde: productId, kitchenItem eller basis.`);
+      const toBuy = ing.buy === true;
+      if ([hasProduct, fromKitchen, isBasis, toBuy].filter(Boolean).length !== 1) {
+        errors.push(`${label}: skal have præcis én kilde: productId, kitchenItem, basis eller buy.`);
         continue;
+      }
+      if (toBuy && !SECTIONS.includes(ing.section!)) {
+        errors.push(`${label}: en vare med buy skal have section (${SECTIONS.join(", ")}).`);
       }
       if (fromKitchen) {
         const item = available.get(ing.kitchenItem!);
@@ -326,7 +323,8 @@ const NOT_VEGETABLE = /tomatketchup|ketchup|tomatpur[eé]|majsstivelse|majstorti
 
 /**
  * What a dish holds: its proteins ("chicken", "beef", "pork", "fish", "veg"), "starch"
- * and "vegetable". Bought products count by search word and name, kitchen items by name.
+ * and "vegetable". Bought products count by search word and name; kitchen items and
+ * items without a price by name.
  */
 function dishParts(ingredients: Ingredient[], products: Map<string, Product>): Set<string> {
   const found = new Set<string>();
@@ -334,7 +332,7 @@ function dishParts(ingredients: Ingredient[], products: Map<string, Product>): S
     if (ing.basis) continue;
     const product = ing.productId ? products.get(ing.productId) : undefined;
     for (const [protein, queries] of Object.entries(PROTEIN_PRODUCTS)) if (product && queries.includes(product.query)) found.add(protein);
-    const name = `${product?.query ?? ""} ${product?.name ?? ""} ${ing.kitchenItem ? ing.name : ""}`.toLowerCase();
+    const name = `${product?.query ?? ""} ${product?.name ?? ""} ${ing.kitchenItem || ing.buy ? ing.name : ""}`.toLowerCase();
     for (const [protein, re] of DANISH_PROTEINS) if (re.test(name)) found.add(protein);
     if (VEG_PROTEIN.test(name)) found.add("veg");
     if (STARCH.test(name)) found.add("starch");

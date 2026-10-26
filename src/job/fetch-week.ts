@@ -9,18 +9,14 @@ import type { HttpClient } from "../fetch/http.ts";
 import { fetchLeaflet, type LeafletInfo } from "../fetch/validity.ts";
 import type { Recipe } from "../recipes.ts";
 import { mondayOf, planWeek, weekKey } from "../week.ts";
-import { chooseQueries, makeable, offerWeights, selectCandidates } from "./candidates.ts";
+import { chooseQueries, offerWeights, selectMains, selectSides } from "./candidates.ts";
 import { chooseStore, SourceChangedError, type StoreChoice } from "./store.ts";
 
 /** Goma pages per run, robots.txt and the store choice included (CLAUDE.md: about 25). */
 const GOMA_PAGES = 24;
-/** Recipes Claude gets to choose among. */
-const CANDIDATES = 40;
-/**
- * Recipes considered before prices are known. Many lack a price for some ingredient,
- * so the pool is large enough that about 40 are left even in the first weeks.
- */
-const POOL = 200;
+/** Mains and sides Claude gets to pair into dinners. */
+const MAINS = 40;
+const SIDES = 30;
 
 export type FetchSummary = {
   week: string;
@@ -80,26 +76,30 @@ export async function fetchWeek({
     throw new SourceChangedError(`${missing.length} af ${items.length} varer gav 0 rækker (${missing.join(", ")}).`);
   }
 
-  // The protein offers just fetched decide which recipes are worth cooking this week,
-  // and their ingredients decide what else to fetch.
+  // Good dinners first: the best-rated mains and sides the household can eat, with the
+  // protein offers just fetched tilting the mix. Their ingredients decide what else to fetch.
   const diet = household.diet;
-  const pool = selectCandidates(recipes, rules, {
-    weights: offerWeights(found, choice.store), diet, recent: recentRecipes(db, week), count: POOL, seed: week,
-  });
+  const options = { diet, recent: recentRecipes(db, week), seed: week };
+  const candidates = [
+    ...selectMains(recipes, offerWeights(found, choice.store), { ...options, count: MAINS }),
+    ...selectSides(recipes, { ...options, count: SIDES }),
+  ];
   const failed = failedQueries(db, week);
-  const fresh = freshQueries(db, week);
-  const { queries, unfetched } = chooseQueries(pool, rules, {
-    diet, fixed: items, budget: GOMA_PAGES - http.pagesFetched(), fresh, failed: new Set(failed.keys()),
+  const { queries, unfetched } = chooseQueries(candidates, rules, {
+    diet, fixed: items, budget: GOMA_PAGES - http.pagesFetched(), fresh: freshQueries(db, week), failed: new Set(failed.keys()),
   });
   const empty = await fetchAll(queries);
+  // A diet variant Goma has no page for: its plain word's page usually lists the variant too.
+  const fallbacks = [...new Set(rules.flatMap((r) =>
+    r.query && !(r.query in counts) && [r.glutenFree, r.lactoseFree].some((v) => v && empty.includes(v)) ? [r.query] : []))];
+  const room = Math.max(0, GOMA_PAGES - http.pagesFetched());
+  empty.push(...await fetchAll(fallbacks.slice(0, room)));
+  unfetched.push(...fallbacks.slice(room));
   if (!http.isBlocked("https://goma.gg/")) for (const query of empty) failed.set(query, week);
   setMeta(db, "emptyQueries", JSON.stringify(Object.fromEntries(failed)));
   if (empty.length) log(`Ingen varer for: ${empty.join(", ")}.`);
 
-  // Claude can only use what has a price, so keep the recipes it can make as they were rated.
-  const priced = new Set([...items, ...queries, ...fresh].filter((q) => !missing.includes(q) && !empty.includes(q)));
-  const candidates = pool.filter((r) => makeable(r, rules, diet, priced)).slice(0, CANDIDATES);
-  if (recipes.length) log(`${candidates.length} opskrifter at vælge imellem. Søgeord fra dem: ${queries.join(", ") || "ingen"}.`);
+  if (recipes.length) log(`${candidates.length} opskrifter at vælge imellem. Søgeord fra dem: ${[...queries, ...fallbacks].join(", ") || "ingen"}.`);
   setMeta(db, `candidates:${week}`, JSON.stringify(candidates.map((r) => r.id)));
 
   // Words not fetched this week are priced from earlier weeks, like a failed search.
