@@ -1065,7 +1065,14 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") { sendPending(); loadState(); }
 });
 
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+if ("serviceWorker" in navigator) {
+  // The page starts from the cached copy. When a new version is deployed, its service worker
+  // takes over with fresh files, and the page reloads once to use them. Not on the first visit.
+  if (navigator.serviceWorker.controller) {
+    navigator.serviceWorker.addEventListener("controllerchange", () => location.reload(), { once: true });
+  }
+  navigator.serviceWorker.register("/sw.js").catch(() => {});
+}
 
 render();
 sendPending();
