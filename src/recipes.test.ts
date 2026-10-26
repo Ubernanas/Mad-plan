@@ -79,9 +79,11 @@ test("amounts that don't pair with the ingredients, and missing servings, are ke
   assert.equal(recipe?.servings, null);
 });
 
-test("the meat in the name counts when the ingredients only show eggs", () => {
+test("the meat in the name counts when the ingredients only show eggs, unless the name says vegetarian", () => {
   const recipe = toRecipe(row({ Name: "Chicken-Fried Steak", RecipeIngredientParts: 'c("eggs", "flour", "milk", "salt")' }));
   assert.deepEqual(recipe?.proteins.sort(), ["beef", "chicken"]);
+  const chickpeas = toRecipe(row({ Name: "Very Quick Butter Chickpeas (Vegetarian Butter Chicken!)", RecipeIngredientParts: 'c("chickpeas", "onion", "curry powder", "potatoes")' }));
+  assert.deepEqual(chickpeas?.proteins, ["veg"]);
 });
 
 test("recipes that are neither a dinner nor a side, too slow, or with too few reviews are left out", () => {

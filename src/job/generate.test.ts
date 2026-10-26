@@ -129,16 +129,40 @@ test("recipeId must be a main and sideRecipeId a side from the week's recipes; e
   assert.ok(errors.some((e) => e.endsWith("sideRecipeId 1 er ikke et tilbehør i recipes.")), errors.join("\n"));
 });
 
-test("a dish may not swap its recipe's protein: shrimp made with chicken loses the recipe", () => {
-  const products = loadProducts(seededDb(), "2026-W43", "Netto", []);
+test("shrimp made with chicken keeps its place in the plan, but not the recipe's credit", async () => {
+  const db = openDb(":memory:");
+  seed(db);
+  setMeta(db, "candidates:2026-W43", "[1,2,7]");
   const shrimp: Recipe = { ...bourbon, id: 7, name: "Cajun Sauteed Shrimp", proteins: ["fish"] };
   const answer = good();
-  answer.dishes[2]!.recipeId = 7; // made with Kyllingebryst
-  const errors = validateResponse(answer, products, household, { items: [] }, new Map([[7, shrimp]]));
-  assert.ok(errors.some((e) => e.includes('"Cajun Sauteed Shrimp" er med fisk')), errors.join("\n"));
-  // The same dish with the chicken recipe is fine.
-  answer.dishes[2]!.recipeId = 1;
-  assert.deepEqual(validateResponse(answer, products, household, { items: [] }, new Map([[1, bourbon]])), []);
+  answer.dishes[1]!.recipeId = 1; // chicken from the chicken recipe: credited
+  answer.dishes[2]!.recipeId = 7; // made with Kyllingebryst, not shrimp
+  answer.dishes[2]!.sideRecipeId = 2;
+  const logged: string[] = [];
+  const { plan } = await generatePlan({ ...options(db, claudeSays(answer)), recipes: [bourbon, lemonPotatoes, shrimp], log: (m) => logged.push(m) });
+  assert.deepEqual(plan.options[1]!.sources?.map((s) => s.name), ["Bourbon Chicken"]);
+  assert.deepEqual(plan.options[2]!.sources?.map((s) => s.name), ["Greek Lemon Potatoes"]);
+  assert.ok(logged.some((m) => m.includes('har ikke proteinet fra "Cajun Sauteed Shrimp"')));
+});
+
+test("duck, lamb and game are protein too, so confit de canard is a whole dinner", () => {
+  const products = loadProducts(seededDb(), "2026-W43", "Netto", []);
+  const answer = good();
+  answer.dishes[0]!.ingredients[0] = { name: "confit de canard", qty: 360, unit: "g", kitchenItem: "k1", checkLabel: false };
+  const kitchen = { items: [{ id: 1, name: "Confit de canard", qty: 725, unit: "g" as const, location: "skab" as const, expires: null, productId: null, source: null }] };
+  assert.deepEqual(validateResponse(answer, products, household, kitchen), []);
+});
+
+test("a failed answer is kept, so it can be looked into", async () => {
+  const db = openDb(":memory:");
+  seed(db);
+  const bad = good();
+  bad.dishes[0]!.ingredients[0]!.productId = "999";
+  await assert.rejects(generatePlan(options(db, claudeSays(bad, bad))));
+  const saved = JSON.parse((db.prepare("SELECT value FROM meta WHERE key = 'lastRejected'").get() as { value: string }).value);
+  assert.equal(saved.attempt, 2);
+  assert.ok(saved.errors.some((e: string) => e.includes("productId 999")));
+  assert.equal(saved.response.dishes.length, 3);
 });
 
 test("the recipe's protein may come from the kitchen", () => {

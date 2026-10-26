@@ -7,16 +7,14 @@ import { mkdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SECTIONS, type Household, type Section } from "../config.ts";
-import { getMeta, type DB } from "../db.ts";
+import { getMeta, setMeta, type DB } from "../db.ts";
 import type { Unit } from "../fetch/size.ts";
 import type { LeafletInfo } from "../fetch/validity.ts";
 import { isExpired, listKitchen, replaceKitchen, todayIso, type KitchenItem } from "../kitchen.ts";
 import { loadRecipes, type Recipe } from "../recipes.ts";
 import { mondayOf, planWeek } from "../week.ts";
 import { PROTEIN_PRODUCTS } from "./candidates.ts";
-import { computePlan, type ClaudeResponse, type Ingredient, type Plan, type Product } from "./compute.ts";
-
-const PROTEIN_NAMES: Record<keyof typeof PROTEIN_PRODUCTS, string> = { chicken: "kylling", beef: "oksekød", pork: "svinekød", fish: "fisk" };
+import { computePlan, type ClaudeResponse, type Dish, type Ingredient, type Plan, type Product } from "./compute.ts";
 
 export const BASIS_ITEMS = ["olie", "salt", "peber", "tørre krydderier", "eddike", "sukker", "vand"];
 const JOB_FILES = import.meta.dirname;
@@ -92,7 +90,12 @@ export async function generatePlan({
     if (errors.length === 0 && "response" in parsed) {
       const response = parsed.response as ClaudeResponse;
       for (const dish of response.dishes) {
-        const used = [dish.recipeId, dish.sideRecipeId].flatMap((id) => (id === undefined || !candidates.has(id) ? [] : [candidates.get(id)!]));
+        const main = dish.recipeId === undefined ? undefined : candidates.get(dish.recipeId);
+        const side = dish.sideRecipeId === undefined ? undefined : candidates.get(dish.sideRecipeId);
+        // Shrimp made with chicken is another dish than the one people rated: it keeps its place, not the credit.
+        const honest = main && keepsProtein(dish, main, products);
+        if (main && !honest) log(`${dish.title}: har ikke proteinet fra "${main.name}", så den krediteres ikke.`);
+        const used = [honest ? main : undefined, side].filter((r): r is Recipe => r !== undefined);
         if (used.length) dish.sources = used.map((r) => ({ name: r.name, rating: r.rating, reviews: r.reviews, url: `https://www.food.com/recipe/${r.id}` }));
       }
       const createdAt = now().toISOString();
@@ -109,6 +112,10 @@ export async function generatePlan({
       return { plan, response };
     }
     log(`Forsøg ${attempt}: svaret blev afvist (${errors.length} fejl): ${errors.slice(0, 5).join("; ")}`);
+    // Kept so a rejection can be looked into afterwards: was it Claude or the check?
+    if ("response" in parsed) {
+      setMeta(db, "lastRejected", JSON.stringify({ at: now().toISOString(), week, attempt, errors, response: parsed.response }));
+    }
   }
   throw new PlanError(`Claudes svar var ugyldigt to gange. Den forrige plan bliver stående. Fejl: ${errors.join("; ")}`);
 }
@@ -219,17 +226,6 @@ export function validateResponse(
     }
   }
 
-  // Shrimp made with chicken is another dish than the one people rated; it may not carry the credit.
-  for (const dish of dishes) {
-    const recipe = dish.recipeId === undefined ? undefined : recipes.get(dish.recipeId);
-    const meats = recipe?.proteins.filter((p) => p !== "veg") as (keyof typeof PROTEIN_PRODUCTS)[] | undefined;
-    if (!recipe || !meats?.length) continue;
-    const used = dishParts(dish.ingredients ?? [], products);
-    if (!meats.some((p) => used.has(p))) {
-      errors.push(`${dish.title}: opskriften "${recipe.name}" er med ${meats.map((p) => PROTEIN_NAMES[p]).join(" eller ")}, men retten har det ikke. Skift aldrig opskriftens protein. Vælg en anden opskrift, eller skriv retten selv uden recipeId.`);
-    }
-  }
-
   // What kitchenItem may point at: the kitchen we sent, or Claude's reading of the text.
   const available = new Map<string, { unit: Unit; qty: number }>();
   if ("text" in kitchen) {
@@ -246,7 +242,7 @@ export function validateResponse(
   // A recipe often describes only the main part; the household still needs a whole dinner.
   for (const dish of dishes) {
     const parts = dishParts(dish.ingredients ?? [], products);
-    if (!["chicken", "beef", "pork", "fish", "veg"].some((p) => parts.has(p))) {
+    if (!["chicken", "beef", "pork", "fish", "veg", "other"].some((p) => parts.has(p))) {
       errors.push(`${dish.title}: retten mangler protein (kød, fisk, æg eller bønner).`);
     }
     if (!parts.has("starch")) {
@@ -313,6 +309,16 @@ const DANISH_PROTEINS: [keyof typeof PROTEIN_PRODUCTS, RegExp][] = [
   ["fish", /laks|torsk|fisk|rejer|tun\b|sej\b|rødspætte|kuller/],
 ];
 
+/** Whether a dish has its recipe's meat or fish, so it is still the dish people rated. */
+function keepsProtein(dish: Dish, recipe: Recipe, products: Map<string, Product>): boolean {
+  const meats = recipe.proteins.filter((p) => p !== "veg");
+  if (!meats.length) return true;
+  const parts = dishParts(dish.ingredients ?? [], products);
+  return meats.some((p) => parts.has(p));
+}
+
+/** Meat that has no search word of its own: duck, lamb, game. Still protein. */
+const OTHER_MEAT = /\band\b|\bande(?!fedt)|canard|\bgås|\blam\b|lamme|vildt|hjort|rådyr|kanin|confit/;
 /** Eggs, beans and the like: protein for a dish without meat or fish. */
 const VEG_PROTEIN = /æg\b|bønne|linse|kikært|tofu/;
 /** What makes a dinner filling. */
@@ -323,7 +329,7 @@ const VEGETABLE = /gulerød|gulerod|peberfrugt|broccoli|kål|spinat|salat|agurk|
 const NOT_VEGETABLE = /tomatketchup|ketchup|tomatpur[eé]|majsstivelse|majstortilla|salatost/g;
 
 /**
- * What a dish holds: its proteins ("chicken", "beef", "pork", "fish", "veg"), "starch"
+ * What a dish holds: its proteins ("chicken", "beef", "pork", "fish", "veg", "other"), "starch"
  * and "vegetable". Bought products count by search word and name; kitchen items and
  * items without a price by name.
  */
@@ -336,6 +342,7 @@ function dishParts(ingredients: Ingredient[], products: Map<string, Product>): S
     const name = `${product?.query ?? ""} ${product?.name ?? ""} ${ing.kitchenItem || ing.buy ? ing.name : ""}`.toLowerCase();
     for (const [protein, re] of DANISH_PROTEINS) if (re.test(name)) found.add(protein);
     if (VEG_PROTEIN.test(name)) found.add("veg");
+    if (OTHER_MEAT.test(name)) found.add("other");
     if (STARCH.test(name)) found.add("starch");
     if (VEGETABLE.test(name.replace(NOT_VEGETABLE, ""))) found.add("vegetable");
   }

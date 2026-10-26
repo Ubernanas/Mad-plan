@@ -142,9 +142,11 @@ export function toRecipe(row: Record<string, string>): Recipe | null {
   const name = decodeHtml(row.Name!.trim());
   if (NOT_A_MEAL.test(name)) return null;
   const names = parseRVector(row.RecipeIngredientParts);
-  // The ingredient list sometimes lacks the meat that the name promises ("Chicken-Fried Steak").
+  // The ingredient list sometimes lacks the meat that the name promises ("Chicken-Fried Steak"),
+  // but "Vegetarian Butter Chicken" promises none.
   let proteins = proteinsOf(names);
-  if (!proteins.length || (proteins.length === 1 && proteins[0] === "veg")) proteins = proteinsOf([...names, name]);
+  const meatless = /vegetarian|vegan|meatless|veggie/i.test(name);
+  if (!meatless && (!proteins.length || (proteins.length === 1 && proteins[0] === "veg"))) proteins = proteinsOf([...names, name]);
   const kind = isSide(name, category, names, proteins) ? "side" : proteins.length ? "main" : null;
   if (!kind) return null;
   const limits = kind === "side" ? SIDE_LIMITS : LIMITS;
