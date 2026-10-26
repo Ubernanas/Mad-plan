@@ -31,8 +31,8 @@ export function loadHousehold(): Household {
 export const SECTIONS = ["frugt og grønt", "kød og fisk", "køl", "kolonial", "frost"] as const;
 export type Section = (typeof SECTIONS)[number];
 
-/** Goma search words priced every week, grouped by the section their products go in. */
-export function loadItemSections(): Record<string, Section> {
+/** Goma search words fetched every week, grouped by the section their products go in. */
+function loadFixedItems(): Record<string, Section> {
   const grouped = readJson<Record<string, string[]>>("varer.json");
   const sections: Record<string, Section> = {};
   for (const [section, queries] of Object.entries(grouped)) {
@@ -44,8 +44,45 @@ export function loadItemSections(): Record<string, Section> {
   return sections;
 }
 
+/**
+ * The section for every search word the job can fetch: the fixed list, plus the words
+ * the week's recipes ask for (config/ingredients.json, with diet variants).
+ */
+export function loadItemSections(): Record<string, Section> {
+  const sections: Record<string, Section> = {};
+  for (const rule of loadIngredientRules()) {
+    if (!rule.query) continue;
+    for (const query of [rule.query, rule.glutenFree, rule.lactoseFree]) if (query) sections[query] = rule.section!;
+  }
+  return { ...sections, ...loadFixedItems() };
+}
+
+/** The search words fetched every week, before the ones the recipes ask for. */
 export function loadItems(): string[] {
-  return Object.keys(loadItemSections());
+  return Object.keys(loadFixedItems());
+}
+
+/**
+ * How an English recipe ingredient is bought: a Goma search word (with a gluten- or
+ * lactose-free variant), or a basis item the household always has. First match wins.
+ */
+export type IngredientRule = {
+  words: string[];
+  basis?: true;
+  query?: string;
+  section?: Section;
+  glutenFree?: string;
+  lactoseFree?: string;
+};
+
+export function loadIngredientRules(): IngredientRule[] {
+  const rules = readJson<IngredientRule[]>("ingredients.json");
+  for (const rule of rules) {
+    if (!rule.basis && !(rule.query && SECTIONS.includes(rule.section!))) {
+      throw new Error(`ingredients.json: "${rule.words[0]}" skal have basis eller query med en afdeling (${SECTIONS.join(", ")}).`);
+    }
+  }
+  return rules;
 }
 
 export function loadPreferences(): string {

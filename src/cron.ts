@@ -2,11 +2,12 @@
 // planCron (18:00) unless one was already made with "Lav planen".
 
 import cron from "node-cron";
-import { loadHousehold, loadItems, type Household } from "./config.ts";
+import { loadHousehold, loadIngredientRules, loadItems, type Household } from "./config.ts";
 import { getMeta, setMeta, type DB } from "./db.ts";
 import { createHttpClient } from "./fetch/http.ts";
 import { fetchWeek } from "./job/fetch-week.ts";
 import { startPlanJob, type JobStatus } from "./job/plan-job.ts";
+import { loadRecipes } from "./recipes.ts";
 import { effectiveHousehold } from "./settings.ts";
 import { planWeek } from "./week.ts";
 
@@ -24,9 +25,11 @@ function setFetchStatus(db: DB, state: JobStatus["state"], message: string): voi
 export async function runFetchJob(db: DB): Promise<void> {
   setFetchStatus(db, "running", "");
   try {
-    const summary = await fetchWeek({ db, http: createHttpClient({ db }), household: effectiveHousehold(db), items: loadItems() });
-    const missing = summary.missing.length ? ` Skøn: ${summary.missing.join(", ")}.` : "";
-    console.log(`[cron] Hentet ${summary.saved} varer fra ${summary.choice.store} for ${summary.week} (${summary.pagesFetched} sider).${missing}`);
+    const summary = await fetchWeek({
+      db, http: createHttpClient({ db }), household: effectiveHousehold(db), items: loadItems(), recipes: loadRecipes(), rules: loadIngredientRules(),
+    });
+    const missing = summary.missing.length ? ` Skøn: ${summary.missing.length} søgeord.` : "";
+    console.log(`[cron] Hentet ${summary.saved} varer fra ${summary.choice.store} for ${summary.week} (${summary.pagesFetched} sider, ${summary.candidates.length} opskrifter).${missing}`);
     setFetchStatus(db, "done", `${summary.saved} varer fra ${summary.choice.store}.${missing}`);
   } catch (error) {
     const message = (error as Error).message;

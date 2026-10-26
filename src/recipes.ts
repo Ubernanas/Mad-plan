@@ -62,13 +62,13 @@ export function minutesOf(iso: string | undefined): number | null {
   return Number(m[1] ?? 0) * 60 + Number(m[2] ?? 0);
 }
 
-/** Broth and soup bases mention a meat without being the dish's protein. */
-const NOT_PROTEIN = /broth|stock|bouillon|soup|base|gravy|seasoning|flavor|fat|drippings/;
+/** Broth, sauces and soup bases mention a meat or fish without being the dish's protein. */
+const NOT_PROTEIN = /broth|stock|bouillon|soup|base|gravy|seasoning|flavor|fat|drippings|sauce|paste/;
 const PROTEIN_WORDS: [Protein, RegExp][] = [
   ["chicken", /\bchicken\b|\bturkey\b/],
   ["beef", /\bbeef\b|\bsteak|\bsirloin|\bchuck\b|\bhamburger\b|\bground (?:round|meat)\b|\bmeatloaf mix\b/],
   ["pork", /\bpork\b|\bbacon\b|\bham\b|\bsausage|\bchorizo\b|\bpancetta\b/],
-  ["fish", /\bsalmon\b|\bcod\b|\btilapia\b|\bfish\b|\btuna\b|\bshrimp|\bprawn|\bhaddock\b|\bpollock\b/],
+  ["fish", /\bsalmon\b|\bcod\b|\btilapia\b|\bfish\b|\btuna\b|\bshrimp|\bprawn|\bhaddock\b|\bpollock\b|\bcrab|\blobster|\bscallop|\bmussel|\bclam/],
   ["veg", /\bbeans?\b|\blentils?\b|\bchickpeas?\b|\bgarbanzo|\btofu\b|\beggs?\b/],
 ];
 
@@ -101,6 +101,9 @@ const NOT_DINNER = new Set([
   "Chocolate Chip Cookies", "Coconut Cream Pie", "Tarts", "Sourdough Breads", "Bread Machine", "Brunch",
 ]);
 
+/** Names of things that come with a dinner rather than being one: marinades, dips, sides, sauces. */
+const NOT_A_MEAL = /marinade|\brub\b|\bdips?\b|dressing|hummus|deviled|guacamole|spread|seasoning|refried|potato salad|broccoli salad|pasta salad|coleslaw|\bslaw\b|appetizer|pickled|jerky|\bbrine\b|\bsauce$|\bglaze$|\bgravy$|stuffing/i;
+
 export const LIMITS = { minRating: 4.5, minReviews: 10, maxMinutes: 75, minIngredients: 4, maxIngredients: 16, maxSteps: 14 };
 
 /** One raw CSV row → a recipe worth suggesting for dinner, or null. */
@@ -128,6 +131,7 @@ export function toRecipe(row: Record<string, string>, limits = LIMITS): Recipe |
 
   // The ingredient list sometimes lacks the meat that the name promises ("Chicken-Fried Steak").
   const name = decodeHtml(row.Name!.trim());
+  if (NOT_A_MEAL.test(name)) return null;
   let proteins = proteinsOf(names);
   if (!proteins.length || (proteins.length === 1 && proteins[0] === "veg")) proteins = proteinsOf([...names, name]);
   if (!proteins.length) return null;

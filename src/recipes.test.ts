@@ -96,10 +96,19 @@ test("recipes that are not a dinner, too slow, too few reviews or without protei
     row({ RecipeIngredientParts: 'c("chicken", "salt")' }),
     row({ RecipeInstructions: 'c("Mix it all.")' }),
     row({ Name: "Plain Rice", RecipeIngredientParts: 'c("rice", "water", "salt", "butter")' }),
+    row({ Name: "Amazing Chicken Marinade" }),
+    row({ Name: "Deviled Eggs" }),
+    row({ Name: "Authentic German Potato Salad" }),
+    row({ Name: "Easy Bourbon BBQ Sauce" }),
   ];
   for (const r of rejects) assert.equal(toRecipe(r), null, JSON.stringify(r));
 });
 
 test("Potato as a keyword does not hide a main course", () => {
   assert.ok(toRecipe(row({ Keywords: 'c("Potato", "Meat")' })));
+});
+
+test("a dish with a sauce in the middle of its name is still a dinner, and crab is fish", () => {
+  assert.ok(toRecipe(row({ Name: "Chicken in Garlic Sauce with Rice" })));
+  assert.deepEqual(proteinsOf(["lump crabmeat", "eggs"]), ["fish"]);
 });

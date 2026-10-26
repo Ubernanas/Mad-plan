@@ -1,7 +1,7 @@
 {
-  "frugt og grønt": ["kartofler", "løg", "gulerødder", "peberfrugt", "broccoli", "hvidløg", "agurk", "citron"],
+  "frugt og grønt": ["kartofler", "løg", "hvidløg"],
   "kød og fisk": ["kylling", "hakket-oksekød", "svinekød", "laks"],
-  "køl": ["æg"],
-  "kolonial": ["ris", "hakkede-tomater", "kokosmælk", "kidneybønner"],
+  "køl": [],
+  "kolonial": ["ris"],
   "frost": []
 }

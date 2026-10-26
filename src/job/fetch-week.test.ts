@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import type { Household } from "../config.ts";
+import { loadIngredientRules, type Household } from "../config.ts";
 import { openDb } from "../db.ts";
 import type { HttpClient } from "../fetch/http.ts";
+import type { Recipe } from "../recipes.ts";
 import { fetchWeek } from "./fetch-week.ts";
 import { SourceChangedError } from "./store.ts";
 
@@ -102,6 +103,36 @@ test("stops before saving when more than half of the item list is empty", async 
   );
   assert.equal((db.prepare("SELECT COUNT(*) AS n FROM products").get() as { n: number }).n, 0);
   assert.equal(db.prepare("SELECT 1 FROM fetches").get(), undefined);
+});
+
+test("recipes decide the extra search words; words Goma lacks are estimates and skipped next week", async () => {
+  const db = openDb(":memory:");
+  const recipe = (id: number, ingredients: string[]): Recipe => ({
+    id, name: `Ret ${id}`, category: "Chicken", minutes: 30, servings: 4, rating: 5, reviews: 100,
+    ingredients, amounts: ingredients.map(() => "1"), steps: ["Cook.", "Serve."], proteins: ["chicken"], gluten: [], dairy: [],
+  });
+  const recipes = [
+    recipe(1, ["chicken breasts", "diced tomatoes", "garlic", "rice", "salt"]),
+    recipe(2, ["chicken thighs", "diced tomatoes", "ginger", "rice"]),
+  ];
+  const pages = { ...NETTO_PAGES, "https://goma.gg/tilbud/hakkede-tomater?store=netto": html("hakkede-tomater__rema1000.html") };
+  const run = (now: () => Date, list = recipes) =>
+    fetchWeek({ db, http: fakeHttp(pages), household, items: ["kylling", "ris"], recipes: list, rules: loadIngredientRules(), now, log: () => {} });
+
+  const summary = await run(FRIDAY);
+  // Each recipe lacks a price for one ingredient (garlic, ginger), which Claude can work around.
+  assert.deepEqual(summary.candidates.map((r) => r.id).sort(), [1, 2]);
+  assert.deepEqual(Object.keys(summary.counts), ["kylling", "ris", "hakkede-tomater", "hvidløg", "ingefær"]);
+  // The fixed list worked, so empty recipe words don't stop the fetch; they become estimates.
+  assert.deepEqual(summary.missing, ["hvidløg", "ingefær"]);
+  const saved = db.prepare("SELECT value FROM meta WHERE key = 'candidates:2026-W43'").get() as { value: string };
+  assert.deepEqual((JSON.parse(saved.value) as number[]).sort(), [1, 2]);
+
+  // Next week the words Goma lacked are not tried again, and a recipe lacking two prices is left out.
+  const twoMissing = recipe(3, ["chicken", "garlic", "ginger", "rice"]);
+  const nextWeek = await run(() => new Date("2026-10-30T12:00:00Z"), [...recipes, twoMissing]);
+  assert.deepEqual(Object.keys(nextWeek.counts), ["kylling", "ris", "hakkede-tomater"]);
+  assert.deepEqual(nextWeek.candidates.map((r) => r.id).sort(), [1, 2]);
 });
 
 test("exactly half empty is still accepted", async () => {
