@@ -153,9 +153,9 @@ Der findes ikke et åbent API for danske tilbudsaviser. Gomas Data API kræver e
 
 ### Søgeord fra opskrifterne
 
-- 40 hovedretter og 30 tilbehør vælges efter bedømmelse, antal anmeldelser og tid; opskrifter fra de sidste 4 ugers planer og opskrifter med for mange gluten- eller laktose-ombytninger er ude. Besparelsen på proteintilbuddene i den valgte butik giver proteinerne på tilbud flere af hovedretterne, men nogle af hver slags. Tilbehøret er højst 4 pr. kategori, så der er kartofler, ris, salater og grønt at parre med. Om ingredienserne har en pris, spiller ingen rolle for valget.
+- 40 hovedretter og 30 tilbehør vælges efter bedømmelse, antal anmeldelser og tid; opskrifter fra de sidste 4 ugers planer og opskrifter med for mange gluten- eller laktose-ombytninger er ude. Besparelsen på proteintilbuddene i den valgte butik giver proteinerne på tilbud flere af hovedretterne, men nogle af hver slags. Tilbehøret er højst 4 pr. kategori, så der er kartofler, ris, salater og grønt at parre med. Om ingredienserne har en pris, spiller ingen rolle for valget. Opskrifter, der bruger det, køkkenet har, trækker op, mest det friske, der udløber inden for 3 dage (højst lige så meget som en god bedømmelse). Køkkenets varer findes via Goma-produktet eller navnet; er der en kladde på Køkken-siden, tæller kun den.
 - `config/ingredients.json` oversætter deres engelske ingredienser til Goma-søgeord (med glutenfri og laktosefri varianter) eller basisvarer. Første match vinder, så sammensatte ord står først.
-- Søgeord uden en pris fra de sidste 4 uger hentes først, derefter dem, flest opskrifter bruger, til siderne er brugt (24 i alt). Resten prissættes fra tidligere uger som skøn, eller får ingen pris. Gav et ord 0 varer, springes det over i 8 uger. Har Goma ingen side for en kostvariant (`laktosefri-fløde`), hentes det almindelige ord (`fløde`) i stedet, for dets side viser også varianterne.
+- Søgeord uden en pris fra de sidste 4 uger hentes først, derefter dem, flest opskrifter bruger, til siderne er brugt (24 i alt). Resten prissættes fra tidligere uger som skøn, eller får ingen pris. Gav et ord 0 varer, springes det over i 8 uger. Har Goma ingen side for en kostvariant (`laktosefri-fløde`), hentes det almindelige ord (`fløde`) i stedet, for dets side viser også varianterne. Husstandens `substitutes` går forud: med `"fløde": "kokosmælk"` hentes kokosmælk, og Claude laver retten med den.
 - Opskrifterne gemmes i `meta` som `candidates:<uge>` til Claude.
 
 ### Høflighed
@@ -263,6 +263,7 @@ Køkkenbeholdningen er et **skøn**, ikke et præcist lager. Vi registrerer ikke
   "dinnersPerWeek": 7,
   "dishOptions": 12,
   "diet": { "glutenFree": true, "lactoseFree": true, "other": "" },
+  "substitutes": { "fløde": "kokosmælk" },
   "stores": ["Netto", "Føtex", "Bilka", "REMA 1000"],
   "storeMode": "cheapest",
   "fixedStore": null,
@@ -274,6 +275,7 @@ Køkkenbeholdningen er et **skøn**, ikke et præcist lager. Vi registrerer ikke
 ```
 
 - `config/varer.json`: den faste liste, der hentes hver uge før opskrifternes søgeord: de 4 proteiner (bruges også til butiksvalg og opskriftsvalg), kartofler, løg, hvidløg og ris, samt gulerødder og agurk, så der altid er grønt til tilbehør. Hold den kort, for hver side her tager en fra opskrifterne.
+- `substitutes` i `household.json`: husstandens faste erstatninger efter Goma-søgeord. Bruges både til, hvad der hentes, og af Claude i opskrifterne.
 - `config/ingredients.json`: ordbogen fra engelske ingredienser til Goma-søgeord eller basisvarer, med afdeling og evt. `glutenFree`/`lactoseFree`-variant. Køber en ingrediens det forkerte, eller finder Goma intet på et søgeord, rettes det her.
 - `config/preferences.md`: fri tekst om, hvad vi kan lide og ikke kan lide, og hvor lang tid en hverdagsret må tage.
 - `config/units.json` (P3): typiske vægte pr. stk.

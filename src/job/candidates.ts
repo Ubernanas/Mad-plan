@@ -5,6 +5,7 @@
 
 import type { Household, IngredientRule } from "../config.ts";
 import type { GomaProduct } from "../fetch/goma.ts";
+import { addDays } from "../kitchen.ts";
 import type { Protein, Recipe } from "../recipes.ts";
 
 type Diet = Household["diet"];
@@ -45,24 +46,28 @@ export function ruleFor(ingredient: string, rules: IngredientRule[]): Ingredient
   return rules.find((rule) => patternOf(rule).test(name)) ?? null;
 }
 
+/** How the household buys: its diet, its own swaps, and the variant pages Goma lacks. */
+export type Buying = { diet: Diet; substitutes?: Record<string, string>; failed?: Set<string> };
+
 /**
- * The search word for a rule: the gluten- or lactose-free variant when the diet asks for
- * it, unless Goma has no page for the variant. Then the plain word, whose page usually
- * lists the variants too ("fløde" has the lactose-free cream).
+ * The search word for a rule. The household's own swap comes first ("fløde" → "kokosmælk").
+ * Then the gluten- or lactose-free variant when the diet asks for it, unless Goma has no
+ * page for the variant; then the plain word, whose page usually lists the variants too.
  */
-export function queryFor(rule: IngredientRule, diet: Diet, failed: Set<string> = new Set()): string | null {
+export function queryFor(rule: IngredientRule, { diet, substitutes = {}, failed = new Set() }: Buying): string | null {
   if (rule.basis) return null;
+  if (rule.query && substitutes[rule.query]) return substitutes[rule.query]!;
   const variant = (diet.glutenFree && rule.glutenFree) || (diet.lactoseFree && rule.lactoseFree) || null;
   if (variant && !failed.has(variant)) return variant;
   return rule.query ?? null;
 }
 
 /** The search words a recipe needs. Basis items and unknown ingredients need none. */
-export function queriesOf(recipe: Recipe, rules: IngredientRule[], diet: Diet, failed?: Set<string>): string[] {
+export function queriesOf(recipe: Recipe, rules: IngredientRule[], buying: Buying): string[] {
   const queries = new Set<string>();
   for (const ingredient of recipe.ingredients) {
     const rule = ruleFor(ingredient, rules);
-    const query = rule && queryFor(rule, diet, failed);
+    const query = rule && queryFor(rule, buying);
     if (query) queries.add(query);
   }
   return [...queries];
@@ -89,6 +94,39 @@ function jitter(seed: string, id: number): number {
   return (hash >>> 0) / 2 ** 32;
 }
 
+/** What is in the kitchen, as search words; true when it is fresh and about to expire. */
+export type KitchenStock = Map<string, boolean>;
+
+/**
+ * The search words the kitchen has. Ticked items know their Goma product; items from
+ * the Køkken text are matched by name ("basmatiris" is ris, "hakket oksekød" is hakket-oksekød).
+ */
+export function kitchenStock(
+  items: { name: string; query: string | null; location: string; expires: string | null }[],
+  text: string,
+  known: string[],
+  today: string,
+): KitchenStock {
+  const soon = (expires: string | null) => expires !== null && expires <= addDays(today, 3);
+  const stock: KitchenStock = new Map();
+  const add = (query: string, fresh: boolean) => stock.set(query, (stock.get(query) ?? false) || fresh);
+  for (const item of items) {
+    const fresh = item.location === "køl" && soon(item.expires);
+    if (item.query) add(item.query, fresh);
+    else for (const query of known) if (mentions(item.name, query)) add(query, fresh);
+  }
+  for (const query of known) if (mentions(text, query)) add(query, false);
+  return stock;
+}
+
+/** Whether a Danish text names a search word: as a phrase, or as the end of a compound word. */
+function mentions(text: string, query: string): boolean {
+  const lower = text.toLowerCase();
+  const words = query.split("-");
+  if (words.length > 1) return lower.includes(words.join(" "));
+  return lower.split(/[^a-zæøåé]+/).some((w) => w === words[0] || (words[0]!.length >= 3 && w.endsWith(words[0]!)));
+}
+
 type CandidateOptions = {
   diet: Diet;
   /** Recipes in the last weeks' plans, so the same dishes don't come back every week. */
@@ -96,16 +134,24 @@ type CandidateOptions = {
   count: number;
   /** The plan week: a new mix every week, the same one on a rerun. */
   seed: string;
+  /** What the kitchen has: recipes that use it rank higher, most of all what is about to expire. */
+  kitchen?: { stock: KitchenStock; rules: IngredientRule[]; buying: Buying };
 };
 
 /** Recipes the household can eat, ranked by what people thought of them, with a new mix every week. */
-function ranked(recipes: Recipe[], { diet, recent, seed }: CandidateOptions): Recipe[] {
+function ranked(recipes: Recipe[], { diet, recent, seed, kitchen }: CandidateOptions): Recipe[] {
   // Many swaps (gluten-free pasta, lactose-free cream …) and the dish is no longer the one people rated.
   const eligible = recipes.filter((r) =>
     !recent.has(r.id) && (!diet.glutenFree || r.gluten.length <= 2) && (!diet.lactoseFree || r.dairy.length <= 3));
   const swaps = (r: Recipe) => (diet.glutenFree ? r.gluten.length : 0) + (diet.lactoseFree ? r.dairy.length : 0);
+  // A preference, not a rule: at most about as much as a good rating gives.
+  const fromKitchen = (r: Recipe) => {
+    if (!kitchen?.stock.size) return 0;
+    const used = queriesOf(r, kitchen.rules, kitchen.buying).filter((q) => kitchen.stock.has(q));
+    return Math.min(1.2, used.reduce((sum, q) => sum + (kitchen.stock.get(q) ? 0.8 : 0.4), 0));
+  };
   const score = (r: Recipe) =>
-    Math.log10(r.reviews) + (r.rating - 4.5) * 2 + (r.minutes <= 40 ? 0.3 : 0) - 0.2 * swaps(r) + jitter(seed, r.id);
+    Math.log10(r.reviews) + (r.rating - 4.5) * 2 + (r.minutes <= 40 ? 0.3 : 0) - 0.2 * swaps(r) + fromKitchen(r) + jitter(seed, r.id);
   return eligible.map((r) => ({ r, s: score(r) })).sort((a, b) => b.s - a.s).map(({ r }) => r);
 }
 
@@ -151,6 +197,7 @@ export function selectSides(recipes: Recipe[], options: CandidateOptions): Recip
 
 type QueryOptions = {
   diet: Diet;
+  substitutes?: Record<string, string>;
   /** Fetched every week anyway. */
   fixed: string[];
   /** Pages left for Goma in this run. */
@@ -169,11 +216,11 @@ type QueryOptions = {
 export function chooseQueries(
   candidates: Recipe[],
   rules: IngredientRule[],
-  { diet, fixed, budget, fresh, failed }: QueryOptions,
+  { diet, substitutes, fixed, budget, fresh, failed }: QueryOptions,
 ): { queries: string[]; unfetched: string[] } {
   const need = new Map<string, number>();
   for (const recipe of candidates) {
-    for (const query of queriesOf(recipe, rules, diet, failed)) {
+    for (const query of queriesOf(recipe, rules, { diet, substitutes, failed })) {
       if (!fixed.includes(query) && !failed.has(query)) need.set(query, (need.get(query) ?? 0) + 1);
     }
   }

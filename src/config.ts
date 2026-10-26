@@ -8,6 +8,11 @@ export type Household = {
   /** How many dishes Claude suggests to choose from. */
   dishOptions: number;
   diet: { glutenFree: boolean; lactoseFree: boolean; other: string };
+  /**
+   * The household's own swaps, by Goma search word: { "fløde": "kokosmælk" } means
+   * coconut milk is bought and cooked with wherever a recipe says cream.
+   */
+  substitutes?: Record<string, string>;
   stores: string[];
   storeMode: "cheapest" | "fixed";
   fixedStore: string | null;

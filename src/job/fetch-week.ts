@@ -9,7 +9,9 @@ import type { HttpClient } from "../fetch/http.ts";
 import { fetchLeaflet, type LeafletInfo } from "../fetch/validity.ts";
 import type { Recipe } from "../recipes.ts";
 import { mondayOf, planWeek, weekKey } from "../week.ts";
-import { chooseQueries, offerWeights, selectMains, selectSides } from "./candidates.ts";
+import { isExpired, listKitchen, todayIso } from "../kitchen.ts";
+import { chooseQueries, kitchenStock, offerWeights, selectMains, selectSides, type KitchenStock } from "./candidates.ts";
+import { getKitchenDraft } from "./plan-job.ts";
 import { chooseStore, SourceChangedError, type StoreChoice } from "./store.ts";
 
 /** Goma pages per run, robots.txt and the store choice included (CLAUDE.md: about 25). */
@@ -79,14 +81,16 @@ export async function fetchWeek({
   // Good dinners first: the best-rated mains and sides the household can eat, with the
   // protein offers just fetched tilting the mix. Their ingredients decide what else to fetch.
   const diet = household.diet;
-  const options = { diet, recent: recentRecipes(db, week), seed: week };
+  const buying = { diet, substitutes: household.substitutes };
+  const kitchen = { stock: stockOf(db, rules, now()), rules, buying };
+  const options = { diet, recent: recentRecipes(db, week), seed: week, kitchen };
   const candidates = [
     ...selectMains(recipes, offerWeights(found, choice.store), { ...options, count: MAINS }),
     ...selectSides(recipes, { ...options, count: SIDES }),
   ];
   const failed = failedQueries(db, week);
   const { queries, unfetched } = chooseQueries(candidates, rules, {
-    diet, fixed: items, budget: GOMA_PAGES - http.pagesFetched(), fresh: freshQueries(db, week), failed: new Set(failed.keys()),
+    diet, substitutes: household.substitutes, fixed: items, budget: GOMA_PAGES - http.pagesFetched(), fresh: freshQueries(db, week), failed: new Set(failed.keys()),
   });
   const empty = await fetchAll(queries);
   // A diet variant Goma has no page for: its plain word's page usually lists the variant too.
@@ -135,6 +139,24 @@ function failedQueries(db: DB, week: string): Map<string, string> {
   const saved = JSON.parse(getMeta(db, "emptyQueries") ?? "{}") as Record<string, string>;
   const since = weeksBefore(week, 8);
   return new Map(Object.entries(saved).filter(([, when]) => when >= since));
+}
+
+/**
+ * What the kitchen holds, as search words. The Køkken page's draft replaces the kitchen
+ * when the plan uses it, so then only the draft counts.
+ */
+function stockOf(db: DB, rules: IngredientRule[], now: Date): KitchenStock {
+  const today = todayIso(now);
+  const known = [...new Set(rules.flatMap((r) => [r.query, r.glutenFree, r.lactoseFree].filter((q): q is string => !!q)))];
+  const draft = getKitchenDraft(db);
+  if (draft) return kitchenStock([], draft, known, today);
+  const queryOf = db.prepare("SELECT query FROM products WHERE goma_id = ? ORDER BY week DESC LIMIT 1");
+  const items = listKitchen(db).filter((item) => !isExpired(item, today)).map((item) => ({
+    ...item,
+    // Ticked items know their Goma product; items without a price ("buy:…") are matched by name.
+    query: item.productId && !item.productId.startsWith("buy:") ? ((queryOf.get(item.productId) as { query: string } | undefined)?.query ?? null) : null,
+  }));
+  return kitchenStock(items, "", known, today);
 }
 
 /** Recipes used in the plans of the last 4 weeks, so they don't come back too soon. */

@@ -9,7 +9,7 @@ På stdin får du JSON med:
 - `recipes`: ugens opskrifter fra Food.com på engelsk. `kind` er `main` (hovedret) eller `side` (tilbehør). Hver har `id`, `name`, `minutes`, `servings`, `rating`, `reviews`, `ingredients`, `amounts`, `steps`, og i `gluten` og `dairy` de ingredienser, der typisk indeholder gluten eller laktose. Kan være tom.
 - `products`: varer med pris fra ugens butik med `id`, `name`, `packageAmount`, `unit`, `price`, `onOffer` og `perKg`. `estimate: true` betyder, at prisen er fra en tidligere uge. Ikke alt, opskrifterne bruger, findes her.
 - `basisItems`: varer, husstanden altid har, og som ikke købes ind.
-- `household`: antal personer, antal aftensmåltider, antal retter at vælge imellem, budget og kosthensyn.
+- `household`: antal personer, antal aftensmåltider, antal retter at vælge imellem, budget, kosthensyn og `substitutes`: husstandens faste erstatninger, fx `{ "fløde": "kokosmælk" }`.
 - `preferences`: husstandens egne ord om, hvad de kan lide, og hvor lang tid maden må tage.
 - `wishes`: husstandens ønsker til netop denne uge. Kan være tom.
 - Enten `kitchen`: det, husstanden har i køkkenet, med `id`, `name`, `qty`, `unit`, `location` og `expires` (sidste gode dag). Eller `kitchenText`: husstandens egne ord om, hvad de har i køkkenet.
@@ -31,6 +31,7 @@ På stdin får du JSON med:
 - Skalér til `household.persons`. Mangler opskriftens `servings`, så skøn det ud fra mængderne.
 - Fahrenheit omregnes til Celsius (350 °F = 175 °C, 400 °F = 200 °C).
 - Amerikanske færdigvarer som "cream of mushroom soup", "Velveeta" eller "Bisquick" erstattes med det, man ville bruge i Danmark, fx fløde og bouillon.
+- Brug altid husstandens `substitutes`: står der `"fløde": "kokosmælk"`, laver du retten med kokosmælk, hvor opskriften bruger fløde, og køber kokosmælk i stedet. Tilpas mængden, så retten bliver lige så cremet.
 
 # Ingredienser
 
@@ -49,7 +50,7 @@ Desuden:
 
 # Køkkenet
 
-- Brug gerne det, der er i køkkenet, især det, der snart udløber.
+- Brug det, der er i køkkenet, før du køber nyt, især det, der snart udløber. Vælg gerne de opskrifter, der kan bruge det. Det sparer penge og smider mindre ud.
 - Får du `kitchenText` i stedet for `kitchen`, så omregn teksten til `kitchen` i dit svar: én vare pr. linje med dit eget `id` ("k1", "k2" …), `name`, `qty`, `unit` (`g`, `ml` eller `stk`), `location` (`køl`, `frost` eller `skab`) og `category` (`fisk`, `hakket`, `kød`, `grønt`, `køl`, `holdbart` eller `frost`). "En halv pose ris" bliver fx 500 g ris i skab. Brug de samme id'er i `kitchenItem`. Får du `kitchen`, så udelad `kitchen` i svaret.
 
 # Kosthensyn

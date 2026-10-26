@@ -4,6 +4,7 @@
   "dinnersPerWeek": 7,
   "dishOptions": 12,
   "diet": { "glutenFree": true, "lactoseFree": true, "other": "" },
+  "substitutes": { "fløde": "kokosmælk" },
   "stores": ["Netto", "Føtex", "Bilka", "REMA 1000"],
   "storeMode": "cheapest",
   "fixedStore": null,

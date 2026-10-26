@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { loadIngredientRules } from "../config.ts";
 import type { GomaProduct } from "../fetch/goma.ts";
 import type { Protein, Recipe } from "../recipes.ts";
-import { chooseQueries, offerWeights, queriesOf, ruleFor, selectMains, selectSides } from "./candidates.ts";
+import { chooseQueries, kitchenStock, offerWeights, queriesOf, ruleFor, selectMains, selectSides } from "./candidates.ts";
 
 const rules = loadIngredientRules();
 const glutenAndLactoseFree = { glutenFree: true, lactoseFree: true, other: "" };
@@ -55,10 +55,35 @@ test("the word table buys the right thing, also where words overlap", () => {
 
 test("the diet picks the gluten- or lactose-free variant", () => {
   const recipe = { ingredients: ["spaghetti", "heavy cream", "soy sauce", "salt"] } as Recipe;
-  assert.deepEqual(queriesOf(recipe, rules, glutenAndLactoseFree), ["glutenfri-pasta", "laktosefri-fløde", "tamari"]);
-  assert.deepEqual(queriesOf(recipe, rules, noDiet), ["pasta", "fløde", "soja"]);
+  assert.deepEqual(queriesOf(recipe, rules, { diet: glutenAndLactoseFree }), ["glutenfri-pasta", "laktosefri-fløde", "tamari"]);
+  assert.deepEqual(queriesOf(recipe, rules, { diet: noDiet }), ["pasta", "fløde", "soja"]);
   // Goma has no page for the variant: the plain word's page lists it too.
-  assert.deepEqual(queriesOf(recipe, rules, glutenAndLactoseFree, new Set(["glutenfri-pasta", "laktosefri-fløde"])), ["pasta", "fløde", "tamari"]);
+  assert.deepEqual(queriesOf(recipe, rules, { diet: glutenAndLactoseFree, failed: new Set(["glutenfri-pasta", "laktosefri-fløde"]) }), ["pasta", "fløde", "tamari"]);
+});
+
+test("the household's own swap comes before the diet variant: coconut milk for cream", () => {
+  const recipe = { ingredients: ["heavy cream", "half-and-half", "chicken"] } as Recipe;
+  assert.deepEqual(queriesOf(recipe, rules, { diet: glutenAndLactoseFree, substitutes: { fløde: "kokosmælk" } }), ["kokosmælk", "kylling"]);
+});
+
+test("the kitchen as search words: ticked products by their search word, text and names by name", () => {
+  const known = ["ris", "løg", "hakket-oksekød", "kylling", "fløde", "kokosmælk"];
+  const stock = kitchenStock([
+    { name: "(dp) netto hk. okse 8-12%", query: "hakket-oksekød", location: "køl", expires: "2026-11-01" },
+    { name: "Basmatiris", query: null, location: "skab", expires: null },
+    { name: "Kyllingebryst", query: "kylling", location: "køl", expires: "2026-11-20" },
+  ], "", known, "2026-10-30");
+  assert.deepEqual([...stock], [["hakket-oksekød", true], ["ris", false], ["kylling", false]]);
+  assert.deepEqual([...kitchenStock([], "2 løg, en halv pose ris og en dåse kokosmælk", known, "2026-10-30").keys()], ["ris", "løg", "kokosmælk"]);
+});
+
+test("recipes that use the kitchen rank higher, most of all what is about to expire", () => {
+  const plain = recipe({ ingredients: ["chicken", "rice", "salt"], reviews: 100 });
+  const usesBeef = recipe({ ingredients: ["ground beef", "rice", "salt"], proteins: ["beef"], reviews: 100 });
+  const opts = (stock: [string, boolean][]) => options({ count: 1, kitchen: { stock: new Map(stock), rules, buying: { diet: noDiet } } });
+  for (const seed of ["a", "b", "c", "d"]) {
+    assert.equal(selectMains([plain, usesBeef], noOffers, { ...opts([["hakket-oksekød", true]]), seed })[0], usesBeef, seed);
+  }
 });
 
 let nextId = 1;

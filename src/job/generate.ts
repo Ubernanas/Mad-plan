@@ -66,6 +66,7 @@ export async function generatePlan({
       dishOptions: household.dishOptions,
       weeklyBudgetDkk: household.weeklyBudgetDkk,
       diet: household.diet,
+      substitutes: household.substitutes ?? {},
     },
     preferences,
     wishes,
