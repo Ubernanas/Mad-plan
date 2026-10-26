@@ -11,10 +11,11 @@ import { getMeta, type DB } from "../db.ts";
 import type { Unit } from "../fetch/size.ts";
 import type { LeafletInfo } from "../fetch/validity.ts";
 import { isExpired, listKitchen, replaceKitchen, todayIso, type KitchenItem } from "../kitchen.ts";
+import { loadRecipes, type Recipe } from "../recipes.ts";
 import { mondayOf, planWeek } from "../week.ts";
 import { computePlan, type ClaudeResponse, type Plan, type Product } from "./compute.ts";
 
-export const BASIS_ITEMS = ["olie", "salt", "peber", "tørre krydderier", "eddike", "sukker"];
+export const BASIS_ITEMS = ["olie", "salt", "peber", "tørre krydderier", "eddike", "sukker", "vand"];
 const JOB_FILES = import.meta.dirname;
 
 export type RunResult = { code: number | null; stdout: string; stderr: string };
@@ -31,13 +32,15 @@ type Options = {
   wishes?: string;
   /** The Køkken page's text, if edited. Claude converts it, and it then replaces the kitchen. */
   kitchenText?: string;
+  /** The recipe dataset; read from recipes/ when the week has candidates and none are given. */
+  recipes?: Recipe[];
   now?: () => Date;
   run?: RunClaude;
   log?: (message: string) => void;
 };
 
 export async function generatePlan({
-  db, household, sections, preferences, wishes = "", kitchenText = "", now = () => new Date(), run = runClaude, log = console.log,
+  db, household, sections, preferences, wishes = "", kitchenText = "", recipes, now = () => new Date(), run = runClaude, log = console.log,
 }: Options): Promise<{ plan: Plan; response: ClaudeResponse }> {
   const week = planWeek(now());
   const fetch = db.prepare("SELECT store, savings_json, missing_json FROM fetches WHERE week = ?").get(week) as
@@ -46,6 +49,7 @@ export async function generatePlan({
   if (!fetch) throw new PlanError(`Der er ikke hentet tilbud for ${week} endnu.`);
 
   const products = loadProducts(db, week, fetch.store, JSON.parse(fetch.missing_json) as string[]);
+  const candidates = loadCandidates(db, week, recipes);
   const today = todayIso(now());
   // Either the kitchen as it stands (expired fresh items left out), or the household's own words about it.
   const kitchen: KitchenSource = kitchenText.trim()
@@ -67,8 +71,10 @@ export async function generatePlan({
       ? { kitchenText: kitchen.text }
       : { kitchen: kitchen.items.map((i) => ({ id: `k${i.id}`, name: i.name, qty: i.qty, unit: i.unit, location: i.location, expires: i.expires })) }),
     products: [...products.values()].map(({ query, estimate, ...p }) => (estimate ? { ...p, estimate } : p)),
+    recipes: [...candidates.values()].map(({ id, name, minutes, servings, rating, reviews, ingredients, amounts, steps, gluten, dairy }) =>
+      ({ id, name, minutes, servings, rating, reviews, ingredients, amounts, steps, gluten, dairy })),
   });
-  const prompt = buildPrompt(week, fetch.store, household, wishes);
+  const prompt = buildPrompt(week, fetch.store, household, wishes, candidates.size);
 
   let errors: string[] = [];
   for (let attempt = 1; attempt <= 2; attempt++) {
@@ -78,9 +84,13 @@ export async function generatePlan({
     const result = await run(input, prompt + retryNote);
     const parsed = parseClaudeOutput(result);
     if ("loginError" in parsed) throw new PlanError(`token udløbet eller ugyldigt (claude: ${parsed.loginError})`);
-    errors = "error" in parsed ? [parsed.error] : validateResponse(parsed.response, products, household, kitchen);
+    errors = "error" in parsed ? [parsed.error] : validateResponse(parsed.response, products, household, kitchen, candidates);
     if (errors.length === 0 && "response" in parsed) {
       const response = parsed.response as ClaudeResponse;
+      for (const dish of response.dishes) {
+        const recipe = dish.recipeId === undefined ? undefined : candidates.get(dish.recipeId);
+        if (recipe) dish.source = { name: recipe.name, rating: recipe.rating, reviews: recipe.reviews, url: `https://www.food.com/recipe/${recipe.id}` };
+      }
       const createdAt = now().toISOString();
       if ("text" in kitchen) useConvertedKitchen(db, response, today);
       const leaflet = JSON.parse(getMeta(db, `leaflet:${week}`) ?? "null") as LeafletInfo | null;
@@ -112,6 +122,14 @@ function useConvertedKitchen(db: DB, response: ClaudeResponse, today: string): v
   }
 }
 
+/** The recipes Sunday's fetch chose for Claude, by id. Empty for weeks fetched before there were recipes. */
+export function loadCandidates(db: DB, week: string, recipes?: Recipe[]): Map<number, Recipe> {
+  const ids = JSON.parse(getMeta(db, `candidates:${week}`) ?? "[]") as number[];
+  if (!ids.length) return new Map();
+  const byId = new Map((recipes ?? loadRecipes()).map((r) => [r.id, r]));
+  return new Map(ids.flatMap((id) => (byId.has(id) ? [[id, byId.get(id)!] as const] : [])));
+}
+
 /** This week's products, plus last known prices for search words that failed this week. */
 export function loadProducts(db: DB, week: string, store: string, missing: string[]): Map<string, Product> {
   type Row = { goma_id: string; name: string; query: string; package_amount: number; unit: Unit; price: number; on_offer: number; per_kg: number | null };
@@ -134,7 +152,7 @@ export function loadProducts(db: DB, week: string, store: string, missing: strin
   return products;
 }
 
-export function buildPrompt(week: string, store: string, household: Household, wishes = ""): string {
+export function buildPrompt(week: string, store: string, household: Household, wishes = "", recipes = 0): string {
   const monday = mondayOf(week);
   const sunday = new Date(monday.getTime() + 6 * 86_400_000);
   const date = (d: Date) => d.toLocaleDateString("da-DK", { day: "numeric", month: "long", timeZone: "UTC" });
@@ -149,6 +167,7 @@ export function buildPrompt(week: string, store: string, household: Household, w
     `Kosthensyn: ${diet.length ? diet.join(", ") : "ingen"}.`,
     `Foreslå ${household.dishOptions} retter, og markér de ${household.dinnersPerWeek}, du anbefaler, til ${household.persons} personer. Budget: ca. ${household.weeklyBudgetDkk} kr.`,
     wishes.trim() ? `Ønsker til ugen: ${wishes.trim()}` : "",
+    recipes ? `Vælg retterne blandt de ${recipes} opskrifter i recipes, og skriv kun selv en ret, hvis for få af dem passer.` : "",
     "Varer, præferencer, ønsker og kosthensyn står i JSON på stdin.",
   ].filter(Boolean).join("\n");
 }
@@ -178,11 +197,16 @@ export function validateResponse(
   products: Map<string, Product>,
   household: Pick<Household, "dinnersPerWeek" | "dishOptions">,
   kitchen: KitchenSource = { items: [] },
+  recipes: Map<number, Recipe> = new Map(),
 ): string[] {
   const response = value as ClaudeResponse;
   if (!response || !Array.isArray(response.dishes)) return ["Svaret har ingen dishes-liste."];
   const errors: string[] = [];
   const { dishes } = response;
+
+  const recipeIds = dishes.flatMap((d) => (d.recipeId === undefined ? [] : [d.recipeId]));
+  for (const id of recipeIds) if (!recipes.has(id)) errors.push(`recipeId ${id} findes ikke i recipes.`);
+  if (new Set(recipeIds).size !== recipeIds.length) errors.push("To retter har samme recipeId. Hver opskrift må kun bruges én gang.");
 
   // What kitchenItem may point at: the kitchen we sent, or Claude's reading of the text.
   const available = new Map<string, { unit: Unit; qty: number }>();

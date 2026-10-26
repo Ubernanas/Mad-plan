@@ -4,9 +4,9 @@ Personligt system, der hver uge henter tilbud fra de butikker, vi handler i, og 
 
 ## Hvad det gør (når alle faser er bygget)
 
-1. **Søndag kl. 14 (Europe/Copenhagen)** henter koden ugens tilbud og priser fra Goma og gemmer dem i SQLite.
+1. **Søndag kl. 14 (Europe/Copenhagen)** henter koden ugens tilbud og priser fra Goma og gemmer dem i SQLite. Ud fra proteintilbuddene vælger den ca. 40 opskrifter fra Food.com-datasættet, og deres ingredienser bestemmer, hvilke varer der hentes.
 2. **Valgfrit (P3):** mellem kl. 14 og 18 kan vi rette, hvad vi har i køkkenet, og trykke "Lav planen".
-3. **Søndag kl. 18** laves planen automatisk, hvis den ikke allerede er lavet. `claude -p` foreslår `dishOptions` retter (standard 12) ud fra de hentede produkter og anbefaler `dinnersPerWeek` af dem. Koden bygger indkøbslisten og regner alle priser ud.
+3. **Søndag kl. 18** laves planen automatisk, hvis den ikke allerede er lavet. `claude -p` vælger `dishOptions` retter (standard 12) blandt opskrifterne, oversætter og tilpasser dem og anbefaler `dinnersPerWeek` af dem. Koden bygger indkøbslisten og regner alle priser ud.
 4. Planen vises på en mobilvenlig webside med ugens retter og en indkøbsliste, vi begge kan krydse af. Claudes anbefalede retter er valgt på forhånd, men vi kan selv vælge andre blandt forslagene.
 
 ## Faser
@@ -39,9 +39,13 @@ Byg én fase ad gangen. Gå først videre, når fasen har kørt et par søndage.
 - Køkkensiden med fritekst før planen laves
 - Det, der er tilbage i køkkenet, bruges i næste uges plan
 
+### Efter P3: opskrifter fra Food.com
+
+Claudes egne opskrifter var for kedelige (ingen saucer, lidt sjæl), så retterne kommer nu fra rigtige, bedømte opskrifter. Se "Opskrifterne" nedenfor.
+
 ### Ikke i nogen fase
 
-Brugerkonti, flere husstande, notifikationer, bedømmelse af retter, byt én ret med et nyt Claude-kald (valg blandt forslagene dækker behovet), opskriftsdatabase, native app. Senere features står i `docs/ideer.md`: lagerkøb og "planlæg resten af ugen igen". Køleskabsskærmen (`#/skaerm`) er bygget. Byg dem ikke, men design datamodellen, så de kan tilføjes: gem kilopriser, og giv `kitchen`-tabellen mængde, enhed, placering (køl, frost, skab) og holdbarhed fra start.
+Brugerkonti, flere husstande, notifikationer, bedømmelse af retter, byt én ret med et nyt Claude-kald (valg blandt forslagene dækker behovet), native app. Senere features står i `docs/ideer.md`: lagerkøb og "planlæg resten af ugen igen". Køleskabsskærmen (`#/skaerm`) er bygget. Byg dem ikke, men design datamodellen, så de kan tilføjes: gem kilopriser, og giv `kitchen`-tabellen mængde, enhed, placering (køl, frost, skab) og holdbarhed fra start.
 
 ## Arkitektur
 
@@ -54,20 +58,23 @@ Brugerkonti, flere husstande, notifikationer, bedømmelse af retter, byt én ret
   - `src/fetch/goma.ts`: henter og parser Gomas søgesider
   - `src/fetch/validity.ts` (P2): avisernes gyldighedsdatoer fra eTilbudsavis
   - `src/job/store.ts`: vælger ugens butik
+  - `src/recipes.ts`: læser og filtrerer Food.com-datasættet; `scripts/import-recipes.ts` laver `recipes/foodcom.json.gz` ud fra det
+  - `src/job/candidates.ts`: vælger ugens opskrifter ud fra tilbuddene og søgeordene ud fra deres ingredienser
   - `src/job/generate.ts`: bygger prompt, kører `claude -p` og validerer svaret
   - `src/job/compute.ts`: bygger indkøbslisten og regner priser og rester ud
   - `src/job/schema.json`: JSON Schema for Claudes svar
   - `src/job/system-prompt.md`: instruktioner til den Claude, der laver planen
   - `src/db.ts`: SQLite
-  - `config/`: husstand, præferencer, vareliste og enhedstabel
+  - `config/`: husstand, præferencer, fast vareliste, ingrediens-ordbog og enhedstabel
+  - `recipes/`: de filtrerede opskrifter (ca. 1 MB, i repoet og i Docker-imaget). Det rå datasæt ligger i `datasets/`, som ikke er i git
   - Arbejdsmappen, som `claude -p` køres fra, ligger uden for repoet: `/data/jobdir` på Fly, temp-mappen lokalt (`JOB_DIR` overstyrer)
 
 ## Arbejdsdeling mellem Claude og koden
 
 Claude er god til at vælge retter. Koden er god til at regne. Hold dem adskilt:
 
-- **Claude** foreslår retter, anbefaler ugens udvalg, skriver opskrifter og angiver for hver ingrediens hvilket produkt fra de hentede data den bruger (`productId`) og hvor meget, i gram, milliliter eller stk.
-- **Koden** gør resten: samler indkøbslisten pr. produkt, runder op til hele pakninger, slår priser op, regner indkøbspris, portionspris og forventede rester ud, og markerer varer med `checkLabel`.
+- **Claude** vælger retter blandt ugens opskrifter, anbefaler ugens udvalg, oversætter og tilpasser opskrifterne (dansk, metrisk, kosthensyn, antal personer) og angiver for hver ingrediens hvilket produkt fra de hentede data den bruger (`productId`) og hvor meget, i gram, milliliter eller stk.
+- **Koden** vælger, hvilke opskrifter Claude får, og gør resten: samler indkøbslisten pr. produkt, runder op til hele pakninger, slår priser op, regner indkøbspris, portionspris og forventede rester ud, og markerer varer med `checkLabel`.
 
 Claude skal aldrig regne priser eller pakninger ud. Det fjerner den største fejlkilde.
 
@@ -88,9 +95,9 @@ Godkendelse sker med `CLAUDE_CODE_OAUTH_TOKEN`, et 1-årigt token lavet lokalt m
     --output-format json --json-schema "$(cat ../src/job/schema.json)"
   ```
 
-- `input.json` indeholder ugens produkter fra den valgte butik (`id`, `name`, `packageAmount`, `unit`, `price`, `onOffer`, `perKg`), præferencer, ønsker til ugen (`wishes`) og kosthensyn. Fra P3 også køkkenbeholdningen.
+- `input.json` indeholder ugens produkter fra den valgte butik (`id`, `name`, `packageAmount`, `unit`, `price`, `onOffer`, `perKg`), præferencer, ønsker til ugen (`wishes`) og kosthensyn. Fra P3 også køkkenbeholdningen. Og ugens opskrifter (`recipes`) på engelsk, som søndagens hentning valgte.
 - Claude må kun bruge produkter fra `input.json`, basisvarer og (fra P3) køkkenvarer.
-- Læs `structured_output`, og valider: hver `productId` findes, mængderne er positive, enheden passer til produktet, der er præcis `dishOptions` forskellige retter, og præcis `dinnersPerWeek` har `suggested: true`. Ved fejl prøves én gang til. Fejler det igen, logges fejlen, og den forrige plan bliver stående.
+- Læs `structured_output`, og valider: hver `productId` findes, mængderne er positive, enheden passer til produktet, der er præcis `dishOptions` forskellige retter, og præcis `dinnersPerWeek` har `suggested: true`. Hver `recipeId` er en af ugens opskrifter og bruges højst én gang. Ved fejl prøves én gang til. Fejler det igen, logges fejlen, og den forrige plan bliver stående.
 - Exit code ≠ 0 eller fejltekst om login: log "token udløbet eller ugyldigt". Tokenet fornyes en gang om året. Udløbsdatoen står i `config/household.json`.
 - Planen laves højst et par gange om ugen. Forbruget tæller med i Pro-grænserne.
 
@@ -100,7 +107,7 @@ Godkendelse sker med `CLAUDE_CODE_OAUTH_TOKEN`, et 1-årigt token lavet lokalt m
 
 - `storeReason`: kort begrundelse for butikken
 - `dietRespected[]`: hvilke kosthensyn planen overholder
-- `dishes[]`: `title`, `description` (én sætning til valget), `suggested`, `servings`, `timeMinutes`, `steps[]` og `ingredients[]` med:
+- `dishes[]`: `title`, `description` (én sætning til valget), `suggested`, `servings`, `timeMinutes`, `steps[]`, `recipeId` (Food.com-opskriftens id; mangler, hvis Claude selv skrev retten) og `ingredients[]` med:
   - retterne står i den rækkefølge, de bør laves i; de valgte får dagene fra mandag i den rækkefølge
   - `name`, `qty`, `unit` (`g`, `ml` eller `stk`)
   - præcis én kilde: `productId` (fra `input.json`), `kitchenItem` (P3) eller `basis: true`
@@ -111,6 +118,7 @@ Godkendelse sker med `CLAUDE_CODE_OAUTH_TOKEN`, et 1-årigt token lavet lokalt m
 
 - `shoppingList[]`: én linje pr. produkt med `section`, `item`, `packageSize`, `packages`, `price`, `priceSource`, `checkLabel`, og fra P2 `buyBefore`
 - `totalPurchaseCost`, og pr. ret `mealCost` og `pricePerPortion`
+- pr. ret med `recipeId`: `source` (opskriftens navn, stjerner, antal anmeldelser og link), som opskriftssiden viser. Claude skriver den aldrig
 - `options[]` (alle forslag med pris), `selected[]` (de valgte), `meals[]` (de valgte med dag) og `products` (et øjebliksbillede af de brugte varer). Vælger vi andre retter, regnes planen om ud fra disse felter alene (`selectDishes`), uden Claude og uden databasen.
 - P2: `leftovers[]` og `leftoverValue`
 
@@ -140,7 +148,14 @@ Der findes ikke et åbent API for danske tilbudsaviser. Gomas Data API kræver e
 
 - `storeMode: "cheapest"` (standard): hent `goma.gg/tilbud/<vare>` for de 4 proteinvarer (`kylling`, `hakket-oksekød`, `svinekød`, `laks`). For hver kæde i `stores` summeres besparelsen (normalpris minus tilbudspris) på tilbuddene. Tilbud, hvor prisen er lig normalprisen, tæller ikke. Kæden med størst samlet besparelse vælges.
 - `storeMode: "fixed"`: brug `fixedStore`, og spring trinnet over.
-- Derefter hentes `goma.gg/tilbud/<vare>?store=<kæde>` for hver vare i `config/varer.json`.
+- Derefter hentes `goma.gg/tilbud/<vare>?store=<kæde>` for hver vare i den faste liste `config/varer.json` (proteinerne og 4 basisvarer).
+
+### Søgeord fra opskrifterne
+
+- Besparelsen på proteintilbuddene i den valgte butik afgør, hvilke 80 opskrifter der vælges: flest med proteinerne på tilbud, men nogle af hver slags. Gode bedømmelser, mange anmeldelser og kort tid trækker op; opskrifter fra de sidste 4 ugers planer og opskrifter med for mange gluten- eller laktose-ombytninger er ude.
+- `config/ingredients.json` oversætter deres engelske ingredienser til Goma-søgeord (med glutenfri og laktosefri varianter) eller basisvarer. Første match vinder, så sammensatte ord står først.
+- Søgeord uden en pris fra de sidste 4 uger hentes først, derefter dem, flest opskrifter bruger, til siderne er brugt (24 i alt). Resten prissættes fra tidligere uger som skøn. Gav et ord 0 varer, springes det over i 8 uger.
+- De højst 40 opskrifter, der mangler pris på højst én ingrediens, gemmes i `meta` som `candidates:<uge>` til Claude.
 
 ### Høflighed
 
@@ -152,16 +167,23 @@ Der findes ikke et åbent API for danske tilbudsaviser. Gomas Data API kræver e
 
 ### Sikring mod tomme data
 
-Giver en proteinsøgning 0 rækker, eller giver over halvdelen af varelisten 0 rækker, stopper jobbet **før** Claude-kaldet med "kilden har ændret sig". Den forrige plan bliver stående.
+Giver en proteinsøgning 0 rækker, eller giver over halvdelen af den faste liste 0 rækker, stopper jobbet **før** Claude-kaldet med "kilden har ændret sig". Den forrige plan bliver stående. Søgeord fra opskrifterne tæller ikke med, for de findes måske bare ikke på Goma.
 
 ## Madplanen
 
 - `dinnersPerWeek` aftensmåltider (standard 7, mandag-søndag) til `persons` personer, med rester til frokost hvor det giver mening.
-- Basisvarer (olie, salt, peber, tørre krydderier, eddike, sukker) står ikke på indkøbslisten.
-- Opskrifterne skrives af Claude. Kopiér ikke opskrifter fra andre sider.
+- Basisvarer (olie, salt, peber, tørre krydderier, eddike, sukker, vand) står ikke på indkøbslisten.
+- Retterne kommer fra Food.com-opskrifterne (se "Opskrifterne"). Claude skriver kun selv en ret, når for få opskrifter passer. Hent aldrig opskrifter fra andre sider.
 - Retter, der deler ingredienser, foretrækkes, så hele pakninger bliver brugt.
 - Indkøbslisten er grupperet efter afdeling og tænkt til 1-2 store indkøb om ugen.
 - **Budget:** `weeklyBudgetDkk` er et mål, ikke en grænse. Claude skal sigte efter det. Siden viser indkøbsprisen ved siden af budgettet, men en plan over budget afvises ikke.
+
+### Opskrifterne
+
+- Kilden er Kaggle-datasættet "Food.com - Recipes and Reviews" (irkaal, CC0, 522.517 opskrifter). Det hentes i hånden som `datasets/recipes.csv`; `npm run import-recipes` filtrerer det til `recipes/foodcom.json.gz`.
+- Filteret: mindst 4,5 stjerner og 10 anmeldelser, højst 75 minutter, 4-16 ingredienser, 2-14 trin, et protein, og ingen desserter, brød, drikke, morgenmad, tilbehør, marinader, dips eller saucer. Ved samme navn beholdes den med flest anmeldelser.
+- Datasættet har mistet enhederne ("1/2", ikke "1/2 cup"), og mængderne passer ikke altid til ingredienserne. Begge lister gemmes, som de er, og Claude læser enhederne ud af trinene.
+- Claude oversætter til dansk og metrisk, skalerer, laver glutenfri og laktosefri varianter og bevarer saucer og krydderier. Siden viser "Efter <navn> fra Food.com · 4,8 ★ (123 anmeldelser)".
 
 ### Kosthensyn
 
@@ -249,7 +271,8 @@ Køkkenbeholdningen er et **skøn**, ikke et præcist lager. Vi registrerer ikke
 }
 ```
 
-- `config/varer.json`: ca. 20 Goma-søgeord, der prissættes hver uge, fx `["kylling", "hakket-oksekød", "svinekød", "laks", "kartofler", "løg", "gulerødder", "peberfrugt", "broccoli", "ris", "hakkede-tomater", "kokosmælk", "kidneybønner", "hvidløg", "æg", "agurk", "citron"]`. Mangler planen ofte en vare, tilføjes den her.
+- `config/varer.json`: den faste liste, der hentes hver uge før opskrifternes søgeord: de 4 proteiner (bruges også til butiksvalg og opskriftsvalg) og kartofler, løg, hvidløg og ris. Hold den kort, for hver side her tager en fra opskrifterne.
+- `config/ingredients.json`: ordbogen fra engelske ingredienser til Goma-søgeord eller basisvarer, med afdeling og evt. `glutenFree`/`lactoseFree`-variant. Køber en ingrediens det forkerte, eller finder Goma intet på et søgeord, rettes det her.
 - `config/preferences.md`: fri tekst om, hvad vi kan lide og ikke kan lide, og hvor lang tid en hverdagsret må tage.
 - `config/units.json` (P3): typiske vægte pr. stk.
 - Fra P2 overstyrer indstillingssiden kosthensyn, personer, retter pr. uge, budget og butik (`src/settings.ts`). Kun de værdier, der afviger fra `household.json`, gemmes i SQLite, så `household.json` stadig er standarden for resten. Jobbene bruger `effectiveHousehold(db)`, ikke `loadHousehold()`.

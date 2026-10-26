@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Household, Section } from "../config.ts";
-import { openDb, type DB } from "../db.ts";
+import { openDb, setMeta, type DB } from "../db.ts";
 import { listKitchen, replaceKitchen } from "../kitchen.ts";
+import type { Recipe } from "../recipes.ts";
 import type { ClaudeResponse } from "./compute.ts";
 import { buildPrompt, generatePlan, jobEnv, loadProducts, parseClaudeOutput, PlanError, validateResponse, type RunClaude } from "./generate.ts";
 
@@ -71,6 +72,55 @@ test("a valid answer is computed and saved as the week's plan", async () => {
   assert.equal(plan.options.length, 3);
   assert.deepEqual(plan.meals.map((m) => m.day), ["mandag", "tirsdag"]);
 });
+
+const bourbon: Recipe = {
+  id: 1, name: "Bourbon Chicken", category: "Chicken Breast", minutes: 35, servings: 4, rating: 5, reviews: 3063,
+  ingredients: ["chicken breasts", "soy sauce", "rice"], amounts: ["2", "1/3", "1"], steps: ["Fry.", "Simmer."],
+  proteins: ["chicken"], gluten: ["soy sauce"], dairy: [],
+};
+
+test("the week's recipes are sent to Claude, and the dishes made from them credit Food.com", async () => {
+  const db = openDb(":memory:");
+  seed(db);
+  setMeta(db, "candidates:2026-W43", "[1]");
+  const answer = good();
+  answer.dishes[1]!.recipeId = 1;
+  const run = claudeSays(answer);
+  const { plan } = await generatePlan({ ...options(db, run), recipes: [bourbon] });
+
+  const sent = JSON.parse(run.inputs[0]!).recipes;
+  assert.deepEqual(sent.map((r: Recipe) => r.name), ["Bourbon Chicken"]);
+  assert.deepEqual(sent[0].gluten, ["soy sauce"]);
+  assert.match(run.prompts[0]!, /blandt de 1 opskrifter/);
+  assert.deepEqual(plan.options[1]!.source, { name: "Bourbon Chicken", rating: 5, reviews: 3063, url: "https://www.food.com/recipe/1" });
+  assert.equal(plan.options[0]!.source, undefined); // written by Claude itself
+});
+
+test("a week without candidates sends no recipes and does not ask for them", async () => {
+  const db = openDb(":memory:");
+  seed(db);
+  const run = claudeSays(good());
+  await generatePlan({ ...options(db, run), recipes: [bourbon] });
+  assert.deepEqual(JSON.parse(run.inputs[0]!).recipes, []);
+  assert.doesNotMatch(run.prompts[0]!, /opskrifter i recipes/);
+});
+
+test("recipeId must be one of the week's recipes, and each recipe is used once", () => {
+  const products = loadProducts(seededDb(), "2026-W43", "Netto", []);
+  const answer = good();
+  answer.dishes[0]!.recipeId = 1;
+  answer.dishes[1]!.recipeId = 1;
+  answer.dishes[2]!.recipeId = 99;
+  const errors = validateResponse(answer, products, household, { items: [] }, new Map([[1, bourbon]]));
+  assert.ok(errors.includes("recipeId 99 findes ikke i recipes."), errors.join("\n"));
+  assert.ok(errors.some((e) => e.startsWith("To retter har samme recipeId")), errors.join("\n"));
+});
+
+function seededDb() {
+  const db = openDb(":memory:");
+  seed(db);
+  return db;
+}
 
 test("the kitchen is sent without expired fresh items, and kitchen ingredients are not bought", async () => {
   const db = openDb(":memory:");

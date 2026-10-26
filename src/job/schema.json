@@ -49,6 +49,9 @@
             "type": "integer",
             "minimum": 1
           },
+          "recipeId": {
+            "type": "integer"
+          },
           "steps": {
             "type": "array",
             "items": {

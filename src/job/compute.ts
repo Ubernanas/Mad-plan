@@ -43,7 +43,13 @@ export type Dish = {
   timeMinutes: number;
   steps: string[];
   ingredients: Ingredient[];
+  /** The Food.com recipe the dish is translated from. Missing when Claude wrote the dish itself. */
+  recipeId?: number;
+  /** Added by the code from the dataset, never by Claude: what the recipe page credits. */
+  source?: RecipeSource;
 };
+
+export type RecipeSource = { name: string; rating: number; reviews: number; url: string };
 
 /** Claude's answer, shaped by schema.json. */
 export type ClaudeResponse = {

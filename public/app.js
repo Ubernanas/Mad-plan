@@ -801,7 +801,7 @@ function screenChoose() {
       <span class="badge" style="background:var(--${tintFor(i)})">${icon(dishIcon(dish))}</span>
       <span class="main"><span class="item">${esc(dish.title)}</span>
         <span class="meta"><span>${esc(dish.description)}</span></span>
-        <span class="meta"><span>${dish.timeMinutes} min · ${kr(dish.pricePerPortion)} pr. portion</span>${dish.suggested ? `<span class="tag suggested">Forslag</span>` : ""}</span></span>
+        <span class="meta"><span>${dish.timeMinutes} min · ${kr(dish.pricePerPortion)} pr. portion${dish.source ? ` · ${stars(dish.source.rating)}` : ""}</span>${dish.suggested ? `<span class="tag suggested">Forslag</span>` : ""}</span></span>
     </button>`;
   });
   return `${back}
@@ -836,6 +836,7 @@ function screenRecipe(week, day) {
       <p class="muted small">${meal.day[0].toUpperCase() + meal.day.slice(1)}</p>
       <h1>${esc(meal.title)}</h1>
       <p class="muted">${meal.timeMinutes} min · ${meal.servings} portioner · ${kr(meal.pricePerPortion)} pr. portion</p>
+      ${sourceLine(meal)}
     </header>
     <div class="section">
       <h2 class="section-title">Ingredienser</h2>
@@ -847,6 +848,15 @@ function screenRecipe(week, day) {
     </div>
     <p class="section small muted">Planen er lavet af AI. Den erstatter ikke at læse varedeklarationen.</p>
     ${canMarkDone(plan, meal) ? `<div class="actions"><button class="button" data-action="day" data-day="${meal.day}" data-status="done">Lavet</button></div>` : ""}`;
+}
+
+const stars = (rating) => `${rating.toLocaleString("da-DK", { maximumFractionDigits: 1 })} ★`;
+
+/** Where the recipe comes from and what people thought of it. Dishes Claude wrote itself have none. */
+function sourceLine(dish) {
+  const s = dish.source;
+  if (!s) return "";
+  return `<p class="small muted">Efter <a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.name)}</a> fra Food.com · ${stars(s.rating)} (${s.reviews.toLocaleString("da-DK")} anmeldelser)</p>`;
 }
 
 /** "Lavet" belongs to this week's dishes up to today, not to days still ahead. */
