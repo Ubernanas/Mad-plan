@@ -148,7 +148,7 @@ Der findes ikke et åbent API for danske tilbudsaviser. Gomas Data API kræver e
 
 - `storeMode: "cheapest"` (standard): hent `goma.gg/tilbud/<vare>` for de 4 proteinvarer (`kylling`, `hakket-oksekød`, `svinekød`, `laks`). For hver kæde i `stores` summeres besparelsen (normalpris minus tilbudspris) på tilbuddene. Tilbud, hvor prisen er lig normalprisen, tæller ikke. Kæden med størst samlet besparelse vælges.
 - `storeMode: "fixed"`: brug `fixedStore`, og spring trinnet over.
-- Derefter hentes `goma.gg/tilbud/<vare>?store=<kæde>` for hver vare i den faste liste `config/varer.json` (proteinerne og 4 basisvarer).
+- Derefter hentes `goma.gg/tilbud/<vare>?store=<kæde>` for hver vare i den faste liste `config/varer.json` (proteinerne, 4 basisvarer og 2 grøntsager til tilbehør).
 
 ### Søgeord fra opskrifterne
 
@@ -183,7 +183,7 @@ Giver en proteinsøgning 0 rækker, eller giver over halvdelen af den faste list
 - Kilden er Kaggle-datasættet "Food.com - Recipes and Reviews" (irkaal, CC0, 522.517 opskrifter). Det hentes i hånden som `datasets/recipes.csv`; `npm run import-recipes` filtrerer det til `recipes/foodcom.json.gz`.
 - Filteret: mindst 4,5 stjerner og 10 anmeldelser, højst 75 minutter, 4-16 ingredienser, 2-14 trin, et protein, og ingen desserter, brød, drikke, morgenmad, tilbehør, marinader, dips eller saucer. Ved samme navn beholdes den med flest anmeldelser.
 - Datasættet har mistet enhederne ("1/2", ikke "1/2 cup"), og mængderne passer ikke altid til ingredienserne. Begge lister gemmes, som de er, og Claude læser enhederne ud af trinene.
-- Claude oversætter til dansk og metrisk, skalerer, laver glutenfri og laktosefri varianter og bevarer saucer og krydderier. Opskriftens protein byttes aldrig (rejer med kylling er en anden ret); laks for anden fisk er i orden. Claude skriver højst 2 retter selv, når der er opskrifter nok. Siden viser "Efter <navn> fra Food.com · 4,8 ★ (123 anmeldelser)".
+- Claude oversætter til dansk og metrisk, skalerer, laver glutenfri og laktosefri varianter og bevarer saucer og krydderier. Opskriftens protein byttes aldrig (rejer med kylling er en anden ret); laks for anden fisk er i orden. Claude skriver højst 2 retter selv, når der er opskrifter nok. Hver ret er en hel aftensmad med protein, mættende tilbehør og grønt; beskriver opskriften kun hovedkomponenten, tilføjer Claude tilbehør og grønt, og valideringen afviser retter uden. Siden viser "Efter <navn> fra Food.com · 4,8 ★ (123 anmeldelser)".
 
 ### Kosthensyn
 
@@ -271,7 +271,7 @@ Køkkenbeholdningen er et **skøn**, ikke et præcist lager. Vi registrerer ikke
 }
 ```
 
-- `config/varer.json`: den faste liste, der hentes hver uge før opskrifternes søgeord: de 4 proteiner (bruges også til butiksvalg og opskriftsvalg) og kartofler, løg, hvidløg og ris. Hold den kort, for hver side her tager en fra opskrifterne.
+- `config/varer.json`: den faste liste, der hentes hver uge før opskrifternes søgeord: de 4 proteiner (bruges også til butiksvalg og opskriftsvalg), kartofler, løg, hvidløg og ris, samt gulerødder og agurk, så der altid er grønt til tilbehør. Hold den kort, for hver side her tager en fra opskrifterne.
 - `config/ingredients.json`: ordbogen fra engelske ingredienser til Goma-søgeord eller basisvarer, med afdeling og evt. `glutenFree`/`lactoseFree`-variant. Køber en ingrediens det forkerte, eller finder Goma intet på et søgeord, rettes det her.
 - `config/preferences.md`: fri tekst om, hvad vi kan lide og ikke kan lide, og hvor lang tid en hverdagsret må tage.
 - `config/units.json` (P3): typiske vægte pr. stk.

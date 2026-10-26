@@ -22,6 +22,7 @@ function seed(db: DB, week = "2026-W43", missing: string[] = []) {
     VALUES (?, 'Netto', ?, ?, ?, ?, ?, ?, NULL, NULL, ?, 'x')`);
   insert.run(week, "1", "ris", "Basmatiris", 1000, "g", 20, 0);
   insert.run(week, "2", "kylling", "Kyllingebryst", 500, "g", 40, 1);
+  insert.run(week, "3", "gulerødder", "Gulerødder", 1000, "g", 10, 0);
   db.prepare("INSERT INTO fetches VALUES (?, 'Netto', 'cheapest', '{\"Netto\":100}', ?, 'x')").run(week, JSON.stringify(missing));
 }
 
@@ -31,6 +32,7 @@ function good(): ClaudeResponse {
     ingredients: [
       { name: "kylling", qty: 250, unit: "g" as const, productId: "2", checkLabel: false },
       { name: "ris", qty: 150, unit: "g" as const, productId: "1", checkLabel: false },
+      { name: "gulerødder", qty: 100, unit: "g" as const, productId: "3", checkLabel: false },
       { name: "salt", qty: 2, unit: "g" as const, basis: true, checkLabel: false },
     ],
   });
@@ -60,12 +62,12 @@ test("a valid answer is computed and saved as the week's plan", async () => {
   const { plan } = await generatePlan(options(db, run));
 
   assert.equal(plan.week, "2026-W43");
-  assert.equal(plan.totalPurchaseCost, 20 + 40); // 300 g of 1 kg rice, 500 g of 500 g chicken
+  assert.equal(plan.totalPurchaseCost, 20 + 40 + 10); // 300 g of 1 kg rice, 500 g of 500 g chicken, 200 g of 1 kg carrots
   const saved = db.prepare("SELECT week, store FROM plans").all();
   assert.deepEqual(saved, [{ week: "2026-W43", store: "Netto" }]);
 
   const input = JSON.parse(run.inputs[0]!);
-  assert.equal(input.products.length, 2);
+  assert.equal(input.products.length, 3);
   assert.deepEqual(Object.keys(input.products[0]).sort(), ["id", "name", "onOffer", "packageAmount", "perKg", "price", "unit"]);
   assert.equal(input.preferences, "Vi kan lide kylling.");
   assert.equal(input.household.dishOptions, 3);
@@ -156,6 +158,38 @@ test("all but 2 dishes come from the recipes, when there are enough of them", ()
   assert.doesNotMatch(buildPrompt("2026-W45", "Netto", { ...household, dishOptions: 12 }, "", 8), /Mindst/);
 });
 
+test("every dish is a whole dinner: protein, a filling side and vegetables", () => {
+  const products = loadProducts(seededDb(), "2026-W43", "Netto", []);
+  const answer = good();
+  const [skewers, rice, carrots] = [answer.dishes[0]!, answer.dishes[1]!, answer.dishes[2]!];
+  skewers.title = "Græsk kyllingespyd";
+  skewers.ingredients = skewers.ingredients.filter((i) => i.productId === "2"); // only the chicken
+  rice.ingredients = rice.ingredients.filter((i) => i.productId !== "2"); // no protein
+  carrots.ingredients = carrots.ingredients.filter((i) => i.productId !== "3"); // no vegetables
+  const errors = validateResponse(answer, products, household);
+  assert.ok(errors.some((e) => e.startsWith("Græsk kyllingespyd: retten mangler mættende tilbehør")), errors.join("\n"));
+  assert.ok(errors.some((e) => e.startsWith("Græsk kyllingespyd: retten mangler grønt")), errors.join("\n"));
+  assert.ok(errors.some((e) => e.startsWith(`${rice.title}: retten mangler protein`)), errors.join("\n"));
+  assert.ok(errors.some((e) => e.startsWith(`${carrots.title}: retten mangler grønt`)), errors.join("\n"));
+  assert.equal(errors.length, 4, errors.join("\n"));
+});
+
+test("ketchup is not a vegetable, but potatoes and rice from the kitchen are a side", () => {
+  const db = seededDb();
+  db.prepare(`INSERT INTO products (week, store, goma_id, query, name, package_amount, unit, price, normal_price, per_kg, on_offer, fetched_at)
+    VALUES ('2026-W43', 'Netto', '4', 'ketchup', 'Tomatketchup', 500, 'g', 9, NULL, NULL, 0, 'x')`).run();
+  const products = loadProducts(db, "2026-W43", "Netto", []);
+  const answer = good();
+  answer.dishes[0]!.ingredients = [
+    { name: "kylling", qty: 250, unit: "g", productId: "2", checkLabel: false },
+    { name: "ketchup", qty: 40, unit: "g", productId: "4", checkLabel: false },
+    { name: "kartofler", qty: 400, unit: "g", kitchenItem: "k1", checkLabel: false },
+  ];
+  const kitchen = { items: [{ id: 1, name: "Kartofler", qty: 1000, unit: "g" as const, location: "skab" as const, expires: null, productId: null, source: null }] };
+  const errors = validateResponse(answer, products, household, kitchen);
+  assert.deepEqual(errors, [`${answer.dishes[0]!.title}: retten mangler grønt (grøntsager eller salat; løg, hvidløg og krydderurter tæller ikke). Tilføj det fra products, og skriv trinene til det.`]);
+});
+
 function seededDb() {
   const db = openDb(":memory:");
   seed(db);
@@ -178,7 +212,7 @@ test("the kitchen is sent without expired fresh items, and kitchen ingredients a
   const sent = JSON.parse(run.inputs[0]!).kitchen;
   assert.deepEqual(sent.map((k: { name: string }) => k.name), ["Ris"]);
   assert.equal(plan.shoppingList.some((l) => l.productId === "1"), false); // rice comes from the kitchen
-  assert.equal(plan.totalPurchaseCost, 40);
+  assert.equal(plan.totalPurchaseCost, 40 + 10);
 });
 
 test("the Køkken text is converted by Claude and replaces the kitchen; dishes point at the new rows", async () => {

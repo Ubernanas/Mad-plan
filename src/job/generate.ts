@@ -230,7 +230,7 @@ export function validateResponse(
     const recipe = dish.recipeId === undefined ? undefined : recipes.get(dish.recipeId);
     const meats = recipe?.proteins.filter((p) => p !== "veg") as (keyof typeof PROTEIN_PRODUCTS)[] | undefined;
     if (!recipe || !meats?.length) continue;
-    const used = dishProteins(dish.ingredients ?? [], products);
+    const used = dishParts(dish.ingredients ?? [], products);
     if (!meats.some((p) => used.has(p))) {
       errors.push(`${dish.title}: opskriften "${recipe.name}" er med ${meats.map((p) => PROTEIN_NAMES[p]).join(" eller ")}, men retten har det ikke. Skift aldrig opskriftens protein. Vælg en anden opskrift, eller skriv retten selv uden recipeId.`);
     }
@@ -247,6 +247,20 @@ export function validateResponse(
     }
   } else {
     for (const item of kitchen.items) available.set(`k${item.id}`, { unit: item.unit, qty: item.qty });
+  }
+
+  // A recipe often describes only the main part; the household still needs a whole dinner.
+  for (const dish of dishes) {
+    const parts = dishParts(dish.ingredients ?? [], products);
+    if (!["chicken", "beef", "pork", "fish", "veg"].some((p) => parts.has(p))) {
+      errors.push(`${dish.title}: retten mangler protein (kød, fisk, æg eller bønner).`);
+    }
+    if (!parts.has("starch")) {
+      errors.push(`${dish.title}: retten mangler mættende tilbehør (kartofler, ris, pasta, brød …). Tilføj det fra products, og skriv trinene til det.`);
+    }
+    if (!parts.has("vegetable")) {
+      errors.push(`${dish.title}: retten mangler grønt (grøntsager eller salat; løg, hvidløg og krydderurter tæller ikke). Tilføj det fra products, og skriv trinene til det.`);
+    }
   }
 
   if (dishes.length !== household.dishOptions) {
@@ -301,14 +315,30 @@ const DANISH_PROTEINS: [keyof typeof PROTEIN_PRODUCTS, RegExp][] = [
   ["fish", /laks|torsk|fisk|rejer|tun\b|sej\b|rødspætte|kuller/],
 ];
 
-/** The proteins a dish uses: bought products by their search word or name, kitchen items by name. */
-function dishProteins(ingredients: Ingredient[], products: Map<string, Product>): Set<string> {
+/** Eggs, beans and the like: protein for a dish without meat or fish. */
+const VEG_PROTEIN = /æg\b|bønne|linse|kikært|tofu/;
+/** What makes a dinner filling. */
+const STARCH = /kartof|\bris\b|basmati|jasmin|pasta|spaghetti|penne|fusilli|nudl|tortilla|brød|boller|couscous|bulgur|quinoa|gnocchi/;
+/** Vegetables and salad. Onion, garlic, herbs and lemon only season, so they don't count. */
+const VEGETABLE = /gulerød|gulerod|peberfrugt|broccoli|kål|spinat|salat|agurk|tomat|champignon|svamp|squash|selleri|grønne bønner|bønnespirer|ærter|majs|avocado|aubergine|porre|rødbede|pastinak|grøntsag|asparges|radise|fennikel/;
+/** Words that look like vegetables but are sauces, starch or cheese. */
+const NOT_VEGETABLE = /tomatketchup|ketchup|tomatpur[eé]|majsstivelse|majstortilla|salatost/g;
+
+/**
+ * What a dish holds: its proteins ("chicken", "beef", "pork", "fish", "veg"), "starch"
+ * and "vegetable". Bought products count by search word and name, kitchen items by name.
+ */
+function dishParts(ingredients: Ingredient[], products: Map<string, Product>): Set<string> {
   const found = new Set<string>();
   for (const ing of ingredients) {
+    if (ing.basis) continue;
     const product = ing.productId ? products.get(ing.productId) : undefined;
     for (const [protein, queries] of Object.entries(PROTEIN_PRODUCTS)) if (product && queries.includes(product.query)) found.add(protein);
-    const name = `${product?.name ?? ""} ${ing.kitchenItem ? ing.name : ""}`.toLowerCase();
+    const name = `${product?.query ?? ""} ${product?.name ?? ""} ${ing.kitchenItem ? ing.name : ""}`.toLowerCase();
     for (const [protein, re] of DANISH_PROTEINS) if (re.test(name)) found.add(protein);
+    if (VEG_PROTEIN.test(name)) found.add("veg");
+    if (STARCH.test(name)) found.add("starch");
+    if (VEGETABLE.test(name.replace(NOT_VEGETABLE, ""))) found.add("vegetable");
   }
   return found;
 }
