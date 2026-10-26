@@ -15,7 +15,8 @@
     "make-plan": "tsx scripts/make-plan.ts",
     "dev": "tsx watch src/server.ts",
     "start": "node src/server.ts",
-    "build-art": "tsx scripts/build-art.ts"
+    "build-art": "tsx scripts/build-art.ts",
+    "import-recipes": "tsx scripts/import-recipes.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",
@@ -29,6 +30,7 @@
     "@fontsource/nunito": "^5.3.0",
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^22.20.5",
+    "csv-parse": "^6.2.1",
     "sharp": "^0.35.5",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"

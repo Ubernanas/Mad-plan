@@ -32,6 +32,7 @@ COPY package.json ./
 COPY --from=deps /app/node_modules ./node_modules
 
 COPY config ./config
+COPY recipes ./recipes
 COPY public ./public
 COPY src ./src
 COPY deploy/start.sh /usr/local/bin/start

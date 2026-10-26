@@ -5,3 +5,6 @@ data/
 *.db-journal
 *.db-wal
 *.db-shm
+
+# Raw recipe datasets (large, downloaded by hand). Only the filtered result is committed.
+datasets/
