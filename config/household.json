@@ -4,7 +4,15 @@
   "dinnersPerWeek": 7,
   "dishOptions": 12,
   "diet": { "glutenFree": true, "lactoseFree": true, "other": "" },
-  "substitutes": { "fløde": "kokosmælk" },
+  "substitutes": {
+    "fløde": "kokosmælk",
+    "rødløg": "løg",
+    "skalotteløg": "løg",
+    "cherrytomater": "tomater",
+    "hvidvin": "bouillon",
+    "rødvin": "bouillon",
+    "revet-ost": "parmesan"
+  },
   "stores": ["Netto", "Føtex", "Bilka", "REMA 1000"],
   "storeMode": "cheapest",
   "fixedStore": null,
