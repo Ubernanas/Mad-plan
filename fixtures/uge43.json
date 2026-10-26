@@ -1,0 +1,2136 @@
+{
+  "week": "2026-W43",
+  "store": "Netto",
+  "createdAt": "2026-10-24T08:09:21.905Z",
+  "weeklyBudgetDkk": 460,
+  "dinnersPerWeek": 7,
+  "wishes": "",
+  "leafletLastDay": null,
+  "storeReason": "Netto har klart den største besparelse på proteintilbud i denne uge (ca. 259 kr), fx på kylling, laks og flæskesteg.",
+  "dietRespected": [
+    "glutenfri",
+    "laktosefri"
+  ],
+  "notes": [
+    "Det hakkede oksekød fra fryseren skal tages op og tø i køleskabet torsdag aften, så det er klar til chilien fredag.",
+    "Den hakkede kylling (1 kg) bruges tirsdag og onsdag. Hvis onsdagens ret bliver rykket, så frys halvdelen samme dag, som I køber ind.",
+    "Kokoskyllingen og chilien laves til 3 portioner, så der er frokost til en dag. Tjek etiketten på karry og varmrøget laks for gluten."
+  ],
+  "options": [
+    {
+      "title": "Ovnbagt laks med kartofler og broccoli",
+      "description": "Saftig laks fra ovnen med ovnkartofler og sprød broccoli.",
+      "suggested": true,
+      "servings": 2,
+      "timeMinutes": 35,
+      "steps": [
+        "Tænd ovnen på 220 °C.",
+        "Skær kartoflerne i både, vend dem med halvdelen af olien, salt og peber, og bag dem i 15 minutter.",
+        "Skær broccolien i buketter og vend den med resten af olien.",
+        "Læg laksen og broccolien på pladen ved kartoflerne, og drys med salt, peber og hakket hvidløg.",
+        "Bag det hele i 12-15 minutter, til laksen lige er gennemstegt."
+      ],
+      "ingredients": [
+        {
+          "name": "laksestykke",
+          "qty": 350,
+          "unit": "g",
+          "productId": "16780",
+          "checkLabel": false
+        },
+        {
+          "name": "kartofler",
+          "qty": 500,
+          "unit": "g",
+          "productId": "15775",
+          "checkLabel": false
+        },
+        {
+          "name": "broccoli",
+          "qty": 1,
+          "unit": "stk",
+          "productId": "16954",
+          "checkLabel": false
+        },
+        {
+          "name": "hvidløg",
+          "qty": 5,
+          "unit": "g",
+          "productId": "14875",
+          "checkLabel": false
+        },
+        {
+          "name": "olie",
+          "qty": 30,
+          "unit": "ml",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "salt",
+          "qty": 5,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "peber",
+          "qty": 2,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        }
+      ],
+      "id": 0,
+      "mealCost": 77.36,
+      "pricePerPortion": 38.68
+    },
+    {
+      "title": "Lun kartoffelsalat med varmrøget laks",
+      "description": "Lune kartofler i eddikedressing med varmrøget laks, æg og forårsløg.",
+      "suggested": false,
+      "servings": 2,
+      "timeMinutes": 30,
+      "steps": [
+        "Kog kartoflerne møre i saltet vand i ca. 20 minutter.",
+        "Kog æggene i 8 minutter, køl dem af og skær dem i både.",
+        "Rør eddike, olie, sukker, salt og peber sammen til en dressing.",
+        "Skær de lune kartofler i stykker og vend dem i dressingen med det snittede forårsløg.",
+        "Anret med laksen i flager og æggene på toppen."
+      ],
+      "ingredients": [
+        {
+          "name": "varmrøget laks",
+          "qty": 200,
+          "unit": "g",
+          "productId": "16288",
+          "checkLabel": true
+        },
+        {
+          "name": "kartofler",
+          "qty": 600,
+          "unit": "g",
+          "productId": "15775",
+          "checkLabel": false
+        },
+        {
+          "name": "æg",
+          "qty": 2,
+          "unit": "stk",
+          "productId": "9690",
+          "checkLabel": false
+        },
+        {
+          "name": "forårsløg",
+          "qty": 1,
+          "unit": "stk",
+          "productId": "15756",
+          "checkLabel": false
+        },
+        {
+          "name": "eddike",
+          "qty": 20,
+          "unit": "ml",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "olie",
+          "qty": 30,
+          "unit": "ml",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "sukker",
+          "qty": 5,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "salt",
+          "qty": 5,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "peber",
+          "qty": 2,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        }
+      ],
+      "id": 1,
+      "mealCost": 70.2,
+      "pricePerPortion": 35.1
+    },
+    {
+      "title": "Kyllingefrikadeller med kartofler og gulerodssalat",
+      "description": "Glutenfri kyllingefrikadeller med kogte kartofler og en frisk, syrlig gulerodssalat.",
+      "suggested": true,
+      "servings": 2,
+      "timeMinutes": 35,
+      "steps": [
+        "Sæt kartoflerne over at koge i saltet vand.",
+        "Riv løget og den rå kartoffel fint, og rør det sammen med hakket kylling, æg, salt og peber.",
+        "Form farsen til frikadeller med en våd ske, og steg dem i olie ved middel varme i 5-6 minutter på hver side.",
+        "Riv gulerødderne groft, og vend dem med eddike, sukker og lidt salt.",
+        "Server frikadellerne med kartofler og gulerodssalat."
+      ],
+      "ingredients": [
+        {
+          "name": "hakket kylling",
+          "qty": 500,
+          "unit": "g",
+          "productId": "26367",
+          "checkLabel": false
+        },
+        {
+          "name": "æg",
+          "qty": 1,
+          "unit": "stk",
+          "kitchenItem": "k4",
+          "checkLabel": false
+        },
+        {
+          "name": "løg",
+          "qty": 100,
+          "unit": "g",
+          "kitchenItem": "k1",
+          "checkLabel": false
+        },
+        {
+          "name": "kartofler",
+          "qty": 550,
+          "unit": "g",
+          "productId": "15775",
+          "checkLabel": false
+        },
+        {
+          "name": "gulerødder",
+          "qty": 300,
+          "unit": "g",
+          "productId": "9725",
+          "checkLabel": false
+        },
+        {
+          "name": "olie",
+          "qty": 30,
+          "unit": "ml",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "eddike",
+          "qty": 15,
+          "unit": "ml",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "sukker",
+          "qty": 5,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "salt",
+          "qty": 6,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "peber",
+          "qty": 2,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        }
+      ],
+      "id": 2,
+      "mealCost": 34.7,
+      "pricePerPortion": 17.35
+    },
+    {
+      "title": "Stegt ris med hakket kylling og æg",
+      "description": "Hurtig wokret med ris, hakket kylling, gulerødder, æg og forårsløg.",
+      "suggested": true,
+      "servings": 2,
+      "timeMinutes": 30,
+      "steps": [
+        "Kog risene, og bred dem ud på en plade, så de køler hurtigt af.",
+        "Skær gulerødderne i små tern, og snit forårsløg og hvidløg.",
+        "Brun den hakkede kylling i halvdelen af olien på en varm pande, og krydr med salt, peber og ingefær.",
+        "Tilsæt gulerødder og hvidløg, og steg 3 minutter.",
+        "Skub det til siden, slå æggene ud på panden og rør dem til de stivner.",
+        "Vend risene i med resten af olien, og steg til de er varme. Drys med forårsløg."
+      ],
+      "ingredients": [
+        {
+          "name": "hakket kylling",
+          "qty": 500,
+          "unit": "g",
+          "productId": "26367",
+          "checkLabel": false
+        },
+        {
+          "name": "ris",
+          "qty": 200,
+          "unit": "g",
+          "kitchenItem": "k2",
+          "checkLabel": false
+        },
+        {
+          "name": "æg",
+          "qty": 3,
+          "unit": "stk",
+          "kitchenItem": "k4",
+          "checkLabel": false
+        },
+        {
+          "name": "gulerødder",
+          "qty": 150,
+          "unit": "g",
+          "productId": "9725",
+          "checkLabel": false
+        },
+        {
+          "name": "forårsløg",
+          "qty": 1,
+          "unit": "stk",
+          "productId": "15756",
+          "checkLabel": false
+        },
+        {
+          "name": "hvidløg",
+          "qty": 10,
+          "unit": "g",
+          "productId": "14875",
+          "checkLabel": false
+        },
+        {
+          "name": "stødt ingefær og chili",
+          "qty": 3,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "olie",
+          "qty": 30,
+          "unit": "ml",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "salt",
+          "qty": 5,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "peber",
+          "qty": 2,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        }
+      ],
+      "id": 3,
+      "mealCost": 36.03,
+      "pricePerPortion": 18.01
+    },
+    {
+      "title": "Kokoskylling med peberfrugt og ris",
+      "description": "Mild karrygryde med kylling, kokosmælk, peberfrugt og broccoli, serveret med ris.",
+      "suggested": true,
+      "servings": 3,
+      "timeMinutes": 30,
+      "steps": [
+        "Sæt risene over at koge.",
+        "Skær kyllingen i tern, og hak løg og hvidløg.",
+        "Brun kyllingen i olien, og tilsæt løg, hvidløg og karry de sidste 2 minutter.",
+        "Tilsæt peberfrugt i strimler og kokosmælk, og lad det simre i 10 minutter.",
+        "Kom broccolibuketterne i de sidste 5 minutter, og smag til med salt.",
+        "Server med ris. Gem en portion til frokost."
+      ],
+      "ingredients": [
+        {
+          "name": "kyllingebrystfilet",
+          "qty": 600,
+          "unit": "g",
+          "productId": "26396",
+          "checkLabel": false
+        },
+        {
+          "name": "kokosmælk",
+          "qty": 400,
+          "unit": "ml",
+          "kitchenItem": "k5",
+          "checkLabel": false
+        },
+        {
+          "name": "løg",
+          "qty": 100,
+          "unit": "g",
+          "kitchenItem": "k1",
+          "checkLabel": false
+        },
+        {
+          "name": "peberfrugter",
+          "qty": 250,
+          "unit": "g",
+          "productId": "17319",
+          "checkLabel": false
+        },
+        {
+          "name": "broccoli",
+          "qty": 1,
+          "unit": "stk",
+          "productId": "16954",
+          "checkLabel": false
+        },
+        {
+          "name": "hvidløg",
+          "qty": 10,
+          "unit": "g",
+          "productId": "14875",
+          "checkLabel": false
+        },
+        {
+          "name": "ris",
+          "qty": 150,
+          "unit": "g",
+          "kitchenItem": "k2",
+          "checkLabel": false
+        },
+        {
+          "name": "karry",
+          "qty": 10,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": true
+        },
+        {
+          "name": "olie",
+          "qty": 15,
+          "unit": "ml",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "salt",
+          "qty": 5,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        }
+      ],
+      "id": 4,
+      "mealCost": 71.72,
+      "pricePerPortion": 23.91
+    },
+    {
+      "title": "Ovnstegte kyllingeoverlår med rodfrugter",
+      "description": "Sprøde kyllingeoverlår bagt på en plade med kartofler, gulerødder og løg.",
+      "suggested": false,
+      "servings": 2,
+      "timeMinutes": 50,
+      "steps": [
+        "Tænd ovnen på 220 °C.",
+        "Skær kartofler, gulerødder og løg i grove stykker, og vend dem med halvdelen af olien, salt og hakket hvidløg.",
+        "Gnid kyllingelårene med resten af olien, paprika, timian, salt og peber.",
+        "Læg kyllingen oven på grøntsagerne med skindet opad.",
+        "Bag i ca. 40 minutter, til skindet er sprødt og kødet er gennemstegt."
+      ],
+      "ingredients": [
+        {
+          "name": "kyllingeoverlår",
+          "qty": 800,
+          "unit": "g",
+          "productId": "26389",
+          "checkLabel": false
+        },
+        {
+          "name": "kartofler",
+          "qty": 600,
+          "unit": "g",
+          "productId": "15775",
+          "checkLabel": false
+        },
+        {
+          "name": "gulerødder",
+          "qty": 300,
+          "unit": "g",
+          "productId": "9725",
+          "checkLabel": false
+        },
+        {
+          "name": "løg",
+          "qty": 150,
+          "unit": "g",
+          "productId": "15734",
+          "checkLabel": false
+        },
+        {
+          "name": "hvidløg",
+          "qty": 10,
+          "unit": "g",
+          "productId": "14875",
+          "checkLabel": false
+        },
+        {
+          "name": "paprika og timian",
+          "qty": 5,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "olie",
+          "qty": 30,
+          "unit": "ml",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "salt",
+          "qty": 6,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "peber",
+          "qty": 2,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        }
+      ],
+      "id": 5,
+      "mealCost": 32.42,
+      "pricePerPortion": 16.21
+    },
+    {
+      "title": "Svinekoteletter med stegte løg og kartofler",
+      "description": "Klassiske stegte koteletter med bløde stegte løg, kogte kartofler og broccoli.",
+      "suggested": false,
+      "servings": 2,
+      "timeMinutes": 30,
+      "steps": [
+        "Kog kartoflerne i saltet vand i ca. 20 minutter.",
+        "Snit løgene, og steg dem bløde og gyldne i halvdelen af olien. Tag dem af panden.",
+        "Krydr koteletterne med salt og peber, og steg dem i resten af olien 4-5 minutter på hver side.",
+        "Kog broccolibuketterne i 4 minutter.",
+        "Server koteletterne med løg, kartofler og broccoli."
+      ],
+      "ingredients": [
+        {
+          "name": "koteletter",
+          "qty": 300,
+          "unit": "g",
+          "productId": "23405",
+          "checkLabel": false
+        },
+        {
+          "name": "kartofler",
+          "qty": 600,
+          "unit": "g",
+          "productId": "15775",
+          "checkLabel": false
+        },
+        {
+          "name": "løg",
+          "qty": 200,
+          "unit": "g",
+          "productId": "15734",
+          "checkLabel": false
+        },
+        {
+          "name": "broccoli",
+          "qty": 1,
+          "unit": "stk",
+          "productId": "16954",
+          "checkLabel": false
+        },
+        {
+          "name": "olie",
+          "qty": 30,
+          "unit": "ml",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "salt",
+          "qty": 5,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "peber",
+          "qty": 2,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        }
+      ],
+      "id": 6,
+      "mealCost": 39.4,
+      "pricePerPortion": 19.7
+    },
+    {
+      "title": "Mørbrad i paprika-tomatgryde med ris",
+      "description": "Strimler af svinemørbrad i en krydret gryde med peberfrugt og tomat, serveret med ris.",
+      "suggested": false,
+      "servings": 2,
+      "timeMinutes": 35,
+      "steps": [
+        "Sæt risene over at koge.",
+        "Skær kødet i strimler, og hak løg og hvidløg.",
+        "Brun kødet i olien ved høj varme, og tag det af panden.",
+        "Svits løg, hvidløg og peberfrugt i strimler i 3 minutter, og drys med paprika.",
+        "Tilsæt de hakkede tomater, og lad det simre i 10 minutter.",
+        "Kom kødet tilbage, varm det igennem, smag til med salt og peber, og server med ris."
+      ],
+      "ingredients": [
+        {
+          "name": "filet á la mørbrad",
+          "qty": 400,
+          "unit": "g",
+          "productId": "23128",
+          "checkLabel": false
+        },
+        {
+          "name": "peberfrugter",
+          "qty": 200,
+          "unit": "g",
+          "productId": "17319",
+          "checkLabel": false
+        },
+        {
+          "name": "løg",
+          "qty": 150,
+          "unit": "g",
+          "productId": "15734",
+          "checkLabel": false
+        },
+        {
+          "name": "hvidløg",
+          "qty": 10,
+          "unit": "g",
+          "productId": "14875",
+          "checkLabel": false
+        },
+        {
+          "name": "hakkede tomater m. urter",
+          "qty": 400,
+          "unit": "g",
+          "productId": "18467",
+          "checkLabel": false
+        },
+        {
+          "name": "ris",
+          "qty": 150,
+          "unit": "g",
+          "productId": "19209",
+          "checkLabel": false
+        },
+        {
+          "name": "paprika",
+          "qty": 5,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "olie",
+          "qty": 15,
+          "unit": "ml",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "salt",
+          "qty": 5,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "peber",
+          "qty": 2,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        }
+      ],
+      "id": 7,
+      "mealCost": 57.06,
+      "pricePerPortion": 28.53
+    },
+    {
+      "title": "Chili con carne med ris",
+      "description": "Krydret gryde med hakket oksekød, kidneybønner, tomat og peberfrugt, serveret med ris.",
+      "suggested": true,
+      "servings": 3,
+      "timeMinutes": 40,
+      "steps": [
+        "Hak løg og hvidløg, og skær peberfrugten i tern.",
+        "Brun oksekødet i olien i en gryde, og tilsæt løg, hvidløg og krydderier.",
+        "Tilsæt peberfrugt, hakkede tomater og skyllede kidneybønner.",
+        "Lad det simre under låg i 20 minutter, og smag til med salt og sukker.",
+        "Kog risene imens, og server. Gem en portion til frokost."
+      ],
+      "ingredients": [
+        {
+          "name": "hakket oksekød",
+          "qty": 300,
+          "unit": "g",
+          "kitchenItem": "k3",
+          "checkLabel": false
+        },
+        {
+          "name": "løg",
+          "qty": 150,
+          "unit": "g",
+          "productId": "15734",
+          "checkLabel": false
+        },
+        {
+          "name": "hvidløg",
+          "qty": 10,
+          "unit": "g",
+          "productId": "14875",
+          "checkLabel": false
+        },
+        {
+          "name": "peberfrugter",
+          "qty": 150,
+          "unit": "g",
+          "productId": "17319",
+          "checkLabel": false
+        },
+        {
+          "name": "hakkede tomater",
+          "qty": 800,
+          "unit": "g",
+          "productId": "30296",
+          "checkLabel": false
+        },
+        {
+          "name": "røde kidneybønner",
+          "qty": 480,
+          "unit": "g",
+          "productId": "16997",
+          "checkLabel": false
+        },
+        {
+          "name": "ris",
+          "qty": 150,
+          "unit": "g",
+          "kitchenItem": "k2",
+          "checkLabel": false
+        },
+        {
+          "name": "spidskommen, paprika og chili",
+          "qty": 10,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "olie",
+          "qty": 15,
+          "unit": "ml",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "salt",
+          "qty": 5,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "sukker",
+          "qty": 5,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        }
+      ],
+      "id": 8,
+      "mealCost": 34.63,
+      "pricePerPortion": 11.54
+    },
+    {
+      "title": "Shakshuka med ovnkartofler",
+      "description": "Æg pocheret i krydret tomat- og peberfrugtsauce, serveret med sprøde ovnkartofler.",
+      "suggested": false,
+      "servings": 2,
+      "timeMinutes": 35,
+      "steps": [
+        "Tænd ovnen på 220 °C. Skær kartoflerne i tern, vend dem med halvdelen af olien og salt, og bag dem i 25 minutter.",
+        "Hak løg og hvidløg, og skær peberfrugten i strimler.",
+        "Svits løg, hvidløg og peberfrugt i resten af olien på en pande i 5 minutter med spidskommen og paprika.",
+        "Tilsæt tomaterne, og lad det simre i 10 minutter.",
+        "Lav 4 fordybninger, slå æggene ud i dem, og lad dem stivne under låg i 6-8 minutter.",
+        "Server med ovnkartoflerne."
+      ],
+      "ingredients": [
+        {
+          "name": "æg",
+          "qty": 4,
+          "unit": "stk",
+          "productId": "9690",
+          "checkLabel": false
+        },
+        {
+          "name": "hakkede tomater m. chili",
+          "qty": 400,
+          "unit": "g",
+          "productId": "17641",
+          "checkLabel": false
+        },
+        {
+          "name": "peberfrugter",
+          "qty": 200,
+          "unit": "g",
+          "productId": "17319",
+          "checkLabel": false
+        },
+        {
+          "name": "løg",
+          "qty": 150,
+          "unit": "g",
+          "productId": "15734",
+          "checkLabel": false
+        },
+        {
+          "name": "hvidløg",
+          "qty": 10,
+          "unit": "g",
+          "productId": "14875",
+          "checkLabel": false
+        },
+        {
+          "name": "kartofler",
+          "qty": 500,
+          "unit": "g",
+          "productId": "15775",
+          "checkLabel": false
+        },
+        {
+          "name": "spidskommen og paprika",
+          "qty": 5,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "olie",
+          "qty": 30,
+          "unit": "ml",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "salt",
+          "qty": 5,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        }
+      ],
+      "id": 9,
+      "mealCost": 29.63,
+      "pricePerPortion": 14.81
+    },
+    {
+      "title": "Flæskesteg med brunede kartofler og ovngulerødder",
+      "description": "Weekendens flæskesteg med sprød svær, brunede kartofler og ovnstegte gulerødder.",
+      "suggested": true,
+      "servings": 2,
+      "timeMinutes": 120,
+      "steps": [
+        "Tænd ovnen på 200 °C. Gnid sværen med salt, og stik laurbærblade ned i ridserne.",
+        "Læg stegen på en rist over en bradepande med lidt vand, og steg i ca. 1½ time. Skru op på 250 °C de sidste 10-15 minutter, så sværen sprøjter.",
+        "Kog kartoflerne møre, og lad dem dampe af.",
+        "Skær gulerødderne i stave, vend dem med halvdelen af olien og salt, og bag dem i ovnen de sidste 30 minutter.",
+        "Smelt sukkeret på en pande til lys karamel, tilsæt resten af olien og kartoflerne, og vend til de er brunede.",
+        "Skær stegen ud, og gem ca. 350 g kød i køleskabet til søndagens biksemad."
+      ],
+      "ingredients": [
+        {
+          "name": "flæskesteg",
+          "qty": 650,
+          "unit": "g",
+          "productId": "47096",
+          "checkLabel": false
+        },
+        {
+          "name": "kartofler",
+          "qty": 600,
+          "unit": "g",
+          "productId": "15775",
+          "checkLabel": false
+        },
+        {
+          "name": "gulerødder",
+          "qty": 400,
+          "unit": "g",
+          "productId": "9725",
+          "checkLabel": false
+        },
+        {
+          "name": "sukker",
+          "qty": 40,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "laurbærblade",
+          "qty": 1,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "olie",
+          "qty": 30,
+          "unit": "ml",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "salt",
+          "qty": 20,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "peber",
+          "qty": 2,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        }
+      ],
+      "id": 10,
+      "mealCost": 31.44,
+      "pricePerPortion": 15.72
+    },
+    {
+      "title": "Biksemad med spejlæg",
+      "description": "Resteret med terninger af flæskesteg, kartofler og løg stegt gyldne og toppet med spejlæg.",
+      "suggested": true,
+      "servings": 2,
+      "timeMinutes": 35,
+      "steps": [
+        "Skær kartoflerne i små tern, og steg dem i to tredjedele af olien ved middel varme i ca. 15 minutter, til de er gyldne og møre.",
+        "Hak løget, og skær flæskestegen i tern.",
+        "Tilsæt løg og kød, og steg videre i 8 minutter. Kom evt. ugens rester af gulerødder eller peberfrugt i.",
+        "Smag til med salt og peber.",
+        "Steg spejlæggene i resten af olien, og læg dem på biksemaden."
+      ],
+      "ingredients": [
+        {
+          "name": "flæskesteg",
+          "qty": 350,
+          "unit": "g",
+          "productId": "47096",
+          "checkLabel": false
+        },
+        {
+          "name": "kartofler",
+          "qty": 500,
+          "unit": "g",
+          "productId": "15775",
+          "checkLabel": false
+        },
+        {
+          "name": "løg",
+          "qty": 150,
+          "unit": "g",
+          "productId": "15734",
+          "checkLabel": false
+        },
+        {
+          "name": "æg",
+          "qty": 2,
+          "unit": "stk",
+          "kitchenItem": "k4",
+          "checkLabel": false
+        },
+        {
+          "name": "olie",
+          "qty": 30,
+          "unit": "ml",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "salt",
+          "qty": 5,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "peber",
+          "qty": 2,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        }
+      ],
+      "id": 11,
+      "mealCost": 17.36,
+      "pricePerPortion": 8.68
+    }
+  ],
+  "selected": [
+    0,
+    2,
+    3,
+    4,
+    8,
+    10,
+    11
+  ],
+  "products": {
+    "9690": {
+      "id": "9690",
+      "name": "Frilandsæg M/L",
+      "query": "æg",
+      "packageAmount": 8,
+      "unit": "stk",
+      "price": 16,
+      "onOffer": true,
+      "perKg": null,
+      "estimate": false,
+      "section": "køl"
+    },
+    "9725": {
+      "id": "9725",
+      "name": "Gulerødder",
+      "query": "gulerødder",
+      "packageAmount": 1000,
+      "unit": "g",
+      "price": 12,
+      "onOffer": false,
+      "perKg": 12,
+      "estimate": false,
+      "section": "frugt og grønt"
+    },
+    "14875": {
+      "id": "14875",
+      "name": "Hvidløg",
+      "query": "hvidløg",
+      "packageAmount": 200,
+      "unit": "g",
+      "price": 14.5,
+      "onOffer": false,
+      "perKg": 72.5,
+      "estimate": false,
+      "section": "frugt og grønt"
+    },
+    "15734": {
+      "id": "15734",
+      "name": "Løg",
+      "query": "løg",
+      "packageAmount": 2000,
+      "unit": "g",
+      "price": 12,
+      "onOffer": true,
+      "perKg": 6,
+      "estimate": false,
+      "section": "frugt og grønt"
+    },
+    "15756": {
+      "id": "15756",
+      "name": "Forårsløg i bundt",
+      "query": "løg",
+      "packageAmount": 1,
+      "unit": "stk",
+      "price": 9,
+      "onOffer": false,
+      "perKg": null,
+      "estimate": false,
+      "section": "frugt og grønt"
+    },
+    "15775": {
+      "id": "15775",
+      "name": "Kartofler",
+      "query": "kartofler",
+      "packageAmount": 1500,
+      "unit": "g",
+      "price": 18,
+      "onOffer": true,
+      "perKg": 12,
+      "estimate": false,
+      "section": "frugt og grønt"
+    },
+    "16288": {
+      "id": "16288",
+      "name": "Varmrøget laks",
+      "query": "laks",
+      "packageAmount": 100,
+      "unit": "g",
+      "price": 25,
+      "onOffer": true,
+      "perKg": 250,
+      "estimate": false,
+      "section": "kød og fisk"
+    },
+    "16780": {
+      "id": "16780",
+      "name": "Lerøy laksestykke 350g",
+      "query": "laks",
+      "packageAmount": 350,
+      "unit": "g",
+      "price": 59,
+      "onOffer": true,
+      "perKg": 168.57,
+      "estimate": false,
+      "section": "kød og fisk"
+    },
+    "16954": {
+      "id": "16954",
+      "name": "Broccoli",
+      "query": "broccoli",
+      "packageAmount": 1,
+      "unit": "stk",
+      "price": 12,
+      "onOffer": true,
+      "perKg": null,
+      "estimate": false,
+      "section": "frugt og grønt"
+    },
+    "16997": {
+      "id": "16997",
+      "name": "Røde kidneybønner",
+      "query": "kidneybønner",
+      "packageAmount": 240,
+      "unit": "g",
+      "price": 7.5,
+      "onOffer": false,
+      "perKg": 31.25,
+      "estimate": false,
+      "section": "kolonial"
+    },
+    "17319": {
+      "id": "17319",
+      "name": "Peberfrugter",
+      "query": "peberfrugt",
+      "packageAmount": 500,
+      "unit": "g",
+      "price": 20,
+      "onOffer": false,
+      "perKg": 40,
+      "estimate": false,
+      "section": "frugt og grønt"
+    },
+    "17641": {
+      "id": "17641",
+      "name": "Hakkede tomater m. chili",
+      "query": "hakkede-tomater",
+      "packageAmount": 400,
+      "unit": "g",
+      "price": 6,
+      "onOffer": true,
+      "perKg": 15,
+      "estimate": false,
+      "section": "kolonial"
+    },
+    "18467": {
+      "id": "18467",
+      "name": "Hakkede tomater m. urter",
+      "query": "hakkede-tomater",
+      "packageAmount": 400,
+      "unit": "g",
+      "price": 6,
+      "onOffer": true,
+      "perKg": 15,
+      "estimate": false,
+      "section": "kolonial"
+    },
+    "19209": {
+      "id": "19209",
+      "name": "Paraboiled ris i kogepose",
+      "query": "ris",
+      "packageAmount": 500,
+      "unit": "g",
+      "price": 8.1,
+      "onOffer": false,
+      "perKg": 16.2,
+      "estimate": false,
+      "section": "kolonial"
+    },
+    "23128": {
+      "id": "23128",
+      "name": "Filet á la mørbrad",
+      "query": "svinekød",
+      "packageAmount": 400,
+      "unit": "g",
+      "price": 39,
+      "onOffer": true,
+      "perKg": 97.5,
+      "estimate": false,
+      "section": "kød og fisk"
+    },
+    "23405": {
+      "id": "23405",
+      "name": "Koteletter",
+      "query": "svinekød",
+      "packageAmount": 300,
+      "unit": "g",
+      "price": 19,
+      "onOffer": true,
+      "perKg": 63.33,
+      "estimate": false,
+      "section": "kød og fisk"
+    },
+    "26367": {
+      "id": "26367",
+      "name": "Hakket kyllingekød 3-7% fedt",
+      "query": "kylling",
+      "packageAmount": 1000,
+      "unit": "g",
+      "price": 49,
+      "onOffer": true,
+      "perKg": 49,
+      "estimate": false,
+      "section": "kød og fisk"
+    },
+    "26389": {
+      "id": "26389",
+      "name": "Kyllingeoverlår m. rygben",
+      "query": "kylling",
+      "packageAmount": 400,
+      "unit": "g",
+      "price": 10,
+      "onOffer": true,
+      "perKg": 25,
+      "estimate": false,
+      "section": "kød og fisk"
+    },
+    "26396": {
+      "id": "26396",
+      "name": "Kyllingebrystfilet",
+      "query": "kylling",
+      "packageAmount": 600,
+      "unit": "g",
+      "price": 49,
+      "onOffer": true,
+      "perKg": 81.67,
+      "estimate": false,
+      "section": "kød og fisk"
+    },
+    "30296": {
+      "id": "30296",
+      "name": "Hakkede tomater",
+      "query": "hakkede-tomater",
+      "packageAmount": 400,
+      "unit": "g",
+      "price": 6,
+      "onOffer": true,
+      "perKg": 15,
+      "estimate": false,
+      "section": "kolonial"
+    },
+    "47096": {
+      "id": "47096",
+      "name": "Flæskesteg",
+      "query": "svinekød",
+      "packageAmount": 1000,
+      "unit": "g",
+      "price": 29.9,
+      "onOffer": true,
+      "perKg": 29.9,
+      "estimate": false,
+      "section": "kød og fisk"
+    }
+  },
+  "done": [],
+  "skippedDays": [],
+  "days": [
+    {
+      "day": "mandag",
+      "mealId": 0,
+      "status": "planned"
+    },
+    {
+      "day": "tirsdag",
+      "mealId": 2,
+      "status": "planned"
+    },
+    {
+      "day": "onsdag",
+      "mealId": 3,
+      "status": "planned"
+    },
+    {
+      "day": "torsdag",
+      "mealId": 4,
+      "status": "planned"
+    },
+    {
+      "day": "fredag",
+      "mealId": 8,
+      "status": "planned"
+    },
+    {
+      "day": "lørdag",
+      "mealId": 10,
+      "status": "planned"
+    },
+    {
+      "day": "søndag",
+      "mealId": 11,
+      "status": "planned"
+    }
+  ],
+  "dropped": [],
+  "meals": [
+    {
+      "title": "Ovnbagt laks med kartofler og broccoli",
+      "description": "Saftig laks fra ovnen med ovnkartofler og sprød broccoli.",
+      "suggested": true,
+      "servings": 2,
+      "timeMinutes": 35,
+      "steps": [
+        "Tænd ovnen på 220 °C.",
+        "Skær kartoflerne i både, vend dem med halvdelen af olien, salt og peber, og bag dem i 15 minutter.",
+        "Skær broccolien i buketter og vend den med resten af olien.",
+        "Læg laksen og broccolien på pladen ved kartoflerne, og drys med salt, peber og hakket hvidløg.",
+        "Bag det hele i 12-15 minutter, til laksen lige er gennemstegt."
+      ],
+      "ingredients": [
+        {
+          "name": "laksestykke",
+          "qty": 350,
+          "unit": "g",
+          "productId": "16780",
+          "checkLabel": false
+        },
+        {
+          "name": "kartofler",
+          "qty": 500,
+          "unit": "g",
+          "productId": "15775",
+          "checkLabel": false
+        },
+        {
+          "name": "broccoli",
+          "qty": 1,
+          "unit": "stk",
+          "productId": "16954",
+          "checkLabel": false
+        },
+        {
+          "name": "hvidløg",
+          "qty": 5,
+          "unit": "g",
+          "productId": "14875",
+          "checkLabel": false
+        },
+        {
+          "name": "olie",
+          "qty": 30,
+          "unit": "ml",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "salt",
+          "qty": 5,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "peber",
+          "qty": 2,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        }
+      ],
+      "id": 0,
+      "mealCost": 77.36,
+      "pricePerPortion": 38.68,
+      "day": "mandag",
+      "status": "planned"
+    },
+    {
+      "title": "Kyllingefrikadeller med kartofler og gulerodssalat",
+      "description": "Glutenfri kyllingefrikadeller med kogte kartofler og en frisk, syrlig gulerodssalat.",
+      "suggested": true,
+      "servings": 2,
+      "timeMinutes": 35,
+      "steps": [
+        "Sæt kartoflerne over at koge i saltet vand.",
+        "Riv løget og den rå kartoffel fint, og rør det sammen med hakket kylling, æg, salt og peber.",
+        "Form farsen til frikadeller med en våd ske, og steg dem i olie ved middel varme i 5-6 minutter på hver side.",
+        "Riv gulerødderne groft, og vend dem med eddike, sukker og lidt salt.",
+        "Server frikadellerne med kartofler og gulerodssalat."
+      ],
+      "ingredients": [
+        {
+          "name": "hakket kylling",
+          "qty": 500,
+          "unit": "g",
+          "productId": "26367",
+          "checkLabel": false
+        },
+        {
+          "name": "æg",
+          "qty": 1,
+          "unit": "stk",
+          "kitchenItem": "k4",
+          "checkLabel": false
+        },
+        {
+          "name": "løg",
+          "qty": 100,
+          "unit": "g",
+          "kitchenItem": "k1",
+          "checkLabel": false
+        },
+        {
+          "name": "kartofler",
+          "qty": 550,
+          "unit": "g",
+          "productId": "15775",
+          "checkLabel": false
+        },
+        {
+          "name": "gulerødder",
+          "qty": 300,
+          "unit": "g",
+          "productId": "9725",
+          "checkLabel": false
+        },
+        {
+          "name": "olie",
+          "qty": 30,
+          "unit": "ml",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "eddike",
+          "qty": 15,
+          "unit": "ml",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "sukker",
+          "qty": 5,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "salt",
+          "qty": 6,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "peber",
+          "qty": 2,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        }
+      ],
+      "id": 2,
+      "mealCost": 34.7,
+      "pricePerPortion": 17.35,
+      "day": "tirsdag",
+      "status": "planned"
+    },
+    {
+      "title": "Stegt ris med hakket kylling og æg",
+      "description": "Hurtig wokret med ris, hakket kylling, gulerødder, æg og forårsløg.",
+      "suggested": true,
+      "servings": 2,
+      "timeMinutes": 30,
+      "steps": [
+        "Kog risene, og bred dem ud på en plade, så de køler hurtigt af.",
+        "Skær gulerødderne i små tern, og snit forårsløg og hvidløg.",
+        "Brun den hakkede kylling i halvdelen af olien på en varm pande, og krydr med salt, peber og ingefær.",
+        "Tilsæt gulerødder og hvidløg, og steg 3 minutter.",
+        "Skub det til siden, slå æggene ud på panden og rør dem til de stivner.",
+        "Vend risene i med resten af olien, og steg til de er varme. Drys med forårsløg."
+      ],
+      "ingredients": [
+        {
+          "name": "hakket kylling",
+          "qty": 500,
+          "unit": "g",
+          "productId": "26367",
+          "checkLabel": false
+        },
+        {
+          "name": "ris",
+          "qty": 200,
+          "unit": "g",
+          "kitchenItem": "k2",
+          "checkLabel": false
+        },
+        {
+          "name": "æg",
+          "qty": 3,
+          "unit": "stk",
+          "kitchenItem": "k4",
+          "checkLabel": false
+        },
+        {
+          "name": "gulerødder",
+          "qty": 150,
+          "unit": "g",
+          "productId": "9725",
+          "checkLabel": false
+        },
+        {
+          "name": "forårsløg",
+          "qty": 1,
+          "unit": "stk",
+          "productId": "15756",
+          "checkLabel": false
+        },
+        {
+          "name": "hvidløg",
+          "qty": 10,
+          "unit": "g",
+          "productId": "14875",
+          "checkLabel": false
+        },
+        {
+          "name": "stødt ingefær og chili",
+          "qty": 3,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "olie",
+          "qty": 30,
+          "unit": "ml",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "salt",
+          "qty": 5,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "peber",
+          "qty": 2,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        }
+      ],
+      "id": 3,
+      "mealCost": 36.03,
+      "pricePerPortion": 18.01,
+      "day": "onsdag",
+      "status": "planned"
+    },
+    {
+      "title": "Kokoskylling med peberfrugt og ris",
+      "description": "Mild karrygryde med kylling, kokosmælk, peberfrugt og broccoli, serveret med ris.",
+      "suggested": true,
+      "servings": 3,
+      "timeMinutes": 30,
+      "steps": [
+        "Sæt risene over at koge.",
+        "Skær kyllingen i tern, og hak løg og hvidløg.",
+        "Brun kyllingen i olien, og tilsæt løg, hvidløg og karry de sidste 2 minutter.",
+        "Tilsæt peberfrugt i strimler og kokosmælk, og lad det simre i 10 minutter.",
+        "Kom broccolibuketterne i de sidste 5 minutter, og smag til med salt.",
+        "Server med ris. Gem en portion til frokost."
+      ],
+      "ingredients": [
+        {
+          "name": "kyllingebrystfilet",
+          "qty": 600,
+          "unit": "g",
+          "productId": "26396",
+          "checkLabel": false
+        },
+        {
+          "name": "kokosmælk",
+          "qty": 400,
+          "unit": "ml",
+          "kitchenItem": "k5",
+          "checkLabel": false
+        },
+        {
+          "name": "løg",
+          "qty": 100,
+          "unit": "g",
+          "kitchenItem": "k1",
+          "checkLabel": false
+        },
+        {
+          "name": "peberfrugter",
+          "qty": 250,
+          "unit": "g",
+          "productId": "17319",
+          "checkLabel": false
+        },
+        {
+          "name": "broccoli",
+          "qty": 1,
+          "unit": "stk",
+          "productId": "16954",
+          "checkLabel": false
+        },
+        {
+          "name": "hvidløg",
+          "qty": 10,
+          "unit": "g",
+          "productId": "14875",
+          "checkLabel": false
+        },
+        {
+          "name": "ris",
+          "qty": 150,
+          "unit": "g",
+          "kitchenItem": "k2",
+          "checkLabel": false
+        },
+        {
+          "name": "karry",
+          "qty": 10,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": true
+        },
+        {
+          "name": "olie",
+          "qty": 15,
+          "unit": "ml",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "salt",
+          "qty": 5,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        }
+      ],
+      "id": 4,
+      "mealCost": 71.72,
+      "pricePerPortion": 23.91,
+      "day": "torsdag",
+      "status": "planned"
+    },
+    {
+      "title": "Chili con carne med ris",
+      "description": "Krydret gryde med hakket oksekød, kidneybønner, tomat og peberfrugt, serveret med ris.",
+      "suggested": true,
+      "servings": 3,
+      "timeMinutes": 40,
+      "steps": [
+        "Hak løg og hvidløg, og skær peberfrugten i tern.",
+        "Brun oksekødet i olien i en gryde, og tilsæt løg, hvidløg og krydderier.",
+        "Tilsæt peberfrugt, hakkede tomater og skyllede kidneybønner.",
+        "Lad det simre under låg i 20 minutter, og smag til med salt og sukker.",
+        "Kog risene imens, og server. Gem en portion til frokost."
+      ],
+      "ingredients": [
+        {
+          "name": "hakket oksekød",
+          "qty": 300,
+          "unit": "g",
+          "kitchenItem": "k3",
+          "checkLabel": false
+        },
+        {
+          "name": "løg",
+          "qty": 150,
+          "unit": "g",
+          "productId": "15734",
+          "checkLabel": false
+        },
+        {
+          "name": "hvidløg",
+          "qty": 10,
+          "unit": "g",
+          "productId": "14875",
+          "checkLabel": false
+        },
+        {
+          "name": "peberfrugter",
+          "qty": 150,
+          "unit": "g",
+          "productId": "17319",
+          "checkLabel": false
+        },
+        {
+          "name": "hakkede tomater",
+          "qty": 800,
+          "unit": "g",
+          "productId": "30296",
+          "checkLabel": false
+        },
+        {
+          "name": "røde kidneybønner",
+          "qty": 480,
+          "unit": "g",
+          "productId": "16997",
+          "checkLabel": false
+        },
+        {
+          "name": "ris",
+          "qty": 150,
+          "unit": "g",
+          "kitchenItem": "k2",
+          "checkLabel": false
+        },
+        {
+          "name": "spidskommen, paprika og chili",
+          "qty": 10,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "olie",
+          "qty": 15,
+          "unit": "ml",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "salt",
+          "qty": 5,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "sukker",
+          "qty": 5,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        }
+      ],
+      "id": 8,
+      "mealCost": 34.63,
+      "pricePerPortion": 11.54,
+      "day": "fredag",
+      "status": "planned"
+    },
+    {
+      "title": "Flæskesteg med brunede kartofler og ovngulerødder",
+      "description": "Weekendens flæskesteg med sprød svær, brunede kartofler og ovnstegte gulerødder.",
+      "suggested": true,
+      "servings": 2,
+      "timeMinutes": 120,
+      "steps": [
+        "Tænd ovnen på 200 °C. Gnid sværen med salt, og stik laurbærblade ned i ridserne.",
+        "Læg stegen på en rist over en bradepande med lidt vand, og steg i ca. 1½ time. Skru op på 250 °C de sidste 10-15 minutter, så sværen sprøjter.",
+        "Kog kartoflerne møre, og lad dem dampe af.",
+        "Skær gulerødderne i stave, vend dem med halvdelen af olien og salt, og bag dem i ovnen de sidste 30 minutter.",
+        "Smelt sukkeret på en pande til lys karamel, tilsæt resten af olien og kartoflerne, og vend til de er brunede.",
+        "Skær stegen ud, og gem ca. 350 g kød i køleskabet til søndagens biksemad."
+      ],
+      "ingredients": [
+        {
+          "name": "flæskesteg",
+          "qty": 650,
+          "unit": "g",
+          "productId": "47096",
+          "checkLabel": false
+        },
+        {
+          "name": "kartofler",
+          "qty": 600,
+          "unit": "g",
+          "productId": "15775",
+          "checkLabel": false
+        },
+        {
+          "name": "gulerødder",
+          "qty": 400,
+          "unit": "g",
+          "productId": "9725",
+          "checkLabel": false
+        },
+        {
+          "name": "sukker",
+          "qty": 40,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "laurbærblade",
+          "qty": 1,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "olie",
+          "qty": 30,
+          "unit": "ml",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "salt",
+          "qty": 20,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "peber",
+          "qty": 2,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        }
+      ],
+      "id": 10,
+      "mealCost": 31.44,
+      "pricePerPortion": 15.72,
+      "day": "lørdag",
+      "status": "planned"
+    },
+    {
+      "title": "Biksemad med spejlæg",
+      "description": "Resteret med terninger af flæskesteg, kartofler og løg stegt gyldne og toppet med spejlæg.",
+      "suggested": true,
+      "servings": 2,
+      "timeMinutes": 35,
+      "steps": [
+        "Skær kartoflerne i små tern, og steg dem i to tredjedele af olien ved middel varme i ca. 15 minutter, til de er gyldne og møre.",
+        "Hak løget, og skær flæskestegen i tern.",
+        "Tilsæt løg og kød, og steg videre i 8 minutter. Kom evt. ugens rester af gulerødder eller peberfrugt i.",
+        "Smag til med salt og peber.",
+        "Steg spejlæggene i resten af olien, og læg dem på biksemaden."
+      ],
+      "ingredients": [
+        {
+          "name": "flæskesteg",
+          "qty": 350,
+          "unit": "g",
+          "productId": "47096",
+          "checkLabel": false
+        },
+        {
+          "name": "kartofler",
+          "qty": 500,
+          "unit": "g",
+          "productId": "15775",
+          "checkLabel": false
+        },
+        {
+          "name": "løg",
+          "qty": 150,
+          "unit": "g",
+          "productId": "15734",
+          "checkLabel": false
+        },
+        {
+          "name": "æg",
+          "qty": 2,
+          "unit": "stk",
+          "kitchenItem": "k4",
+          "checkLabel": false
+        },
+        {
+          "name": "olie",
+          "qty": 30,
+          "unit": "ml",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "salt",
+          "qty": 5,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        },
+        {
+          "name": "peber",
+          "qty": 2,
+          "unit": "g",
+          "basis": true,
+          "checkLabel": false
+        }
+      ],
+      "id": 11,
+      "mealCost": 17.36,
+      "pricePerPortion": 8.68,
+      "day": "søndag",
+      "status": "planned"
+    }
+  ],
+  "shoppingList": [
+    {
+      "productId": "16954",
+      "section": "frugt og grønt",
+      "item": "Broccoli",
+      "packageSize": "1 stk",
+      "packageAmount": 1,
+      "unit": "stk",
+      "usedAmount": 2,
+      "packages": 2,
+      "price": 24,
+      "priceSource": "offer",
+      "checkLabel": false,
+      "buyBefore": null,
+      "buyEarly": false
+    },
+    {
+      "productId": "15756",
+      "section": "frugt og grønt",
+      "item": "Forårsløg i bundt",
+      "packageSize": "1 stk",
+      "packageAmount": 1,
+      "unit": "stk",
+      "usedAmount": 1,
+      "packages": 1,
+      "price": 9,
+      "priceSource": "regular",
+      "checkLabel": false,
+      "buyBefore": null,
+      "buyEarly": false
+    },
+    {
+      "productId": "9725",
+      "section": "frugt og grønt",
+      "item": "Gulerødder",
+      "packageSize": "1 kg",
+      "packageAmount": 1000,
+      "unit": "g",
+      "usedAmount": 850,
+      "packages": 1,
+      "price": 12,
+      "priceSource": "regular",
+      "checkLabel": false,
+      "buyBefore": null,
+      "buyEarly": false
+    },
+    {
+      "productId": "14875",
+      "section": "frugt og grønt",
+      "item": "Hvidløg",
+      "packageSize": "200 g",
+      "packageAmount": 200,
+      "unit": "g",
+      "usedAmount": 35,
+      "packages": 1,
+      "price": 14.5,
+      "priceSource": "regular",
+      "checkLabel": false,
+      "buyBefore": null,
+      "buyEarly": false
+    },
+    {
+      "productId": "15775",
+      "section": "frugt og grønt",
+      "item": "Kartofler",
+      "packageSize": "1,5 kg",
+      "packageAmount": 1500,
+      "unit": "g",
+      "usedAmount": 2150,
+      "packages": 2,
+      "price": 36,
+      "priceSource": "offer",
+      "checkLabel": false,
+      "buyBefore": null,
+      "buyEarly": false
+    },
+    {
+      "productId": "15734",
+      "section": "frugt og grønt",
+      "item": "Løg",
+      "packageSize": "2 kg",
+      "packageAmount": 2000,
+      "unit": "g",
+      "usedAmount": 300,
+      "packages": 1,
+      "price": 12,
+      "priceSource": "offer",
+      "checkLabel": false,
+      "buyBefore": null,
+      "buyEarly": false
+    },
+    {
+      "productId": "17319",
+      "section": "frugt og grønt",
+      "item": "Peberfrugter",
+      "packageSize": "500 g",
+      "packageAmount": 500,
+      "unit": "g",
+      "usedAmount": 400,
+      "packages": 1,
+      "price": 20,
+      "priceSource": "regular",
+      "checkLabel": false,
+      "buyBefore": null,
+      "buyEarly": false
+    },
+    {
+      "productId": "47096",
+      "section": "kød og fisk",
+      "item": "Flæskesteg",
+      "packageSize": "1 kg",
+      "packageAmount": 1000,
+      "unit": "g",
+      "usedAmount": 1000,
+      "packages": 1,
+      "price": 29.9,
+      "priceSource": "offer",
+      "checkLabel": false,
+      "buyBefore": null,
+      "buyEarly": false
+    },
+    {
+      "productId": "26367",
+      "section": "kød og fisk",
+      "item": "Hakket kyllingekød 3-7% fedt",
+      "packageSize": "1 kg",
+      "packageAmount": 1000,
+      "unit": "g",
+      "usedAmount": 1000,
+      "packages": 1,
+      "price": 49,
+      "priceSource": "offer",
+      "checkLabel": false,
+      "buyBefore": null,
+      "buyEarly": false
+    },
+    {
+      "productId": "26396",
+      "section": "kød og fisk",
+      "item": "Kyllingebrystfilet",
+      "packageSize": "600 g",
+      "packageAmount": 600,
+      "unit": "g",
+      "usedAmount": 600,
+      "packages": 1,
+      "price": 49,
+      "priceSource": "offer",
+      "checkLabel": false,
+      "buyBefore": null,
+      "buyEarly": false
+    },
+    {
+      "productId": "16780",
+      "section": "kød og fisk",
+      "item": "Lerøy laksestykke 350g",
+      "packageSize": "350 g",
+      "packageAmount": 350,
+      "unit": "g",
+      "usedAmount": 350,
+      "packages": 1,
+      "price": 59,
+      "priceSource": "offer",
+      "checkLabel": false,
+      "buyBefore": null,
+      "buyEarly": false
+    },
+    {
+      "productId": "30296",
+      "section": "kolonial",
+      "item": "Hakkede tomater",
+      "packageSize": "400 g",
+      "packageAmount": 400,
+      "unit": "g",
+      "usedAmount": 800,
+      "packages": 2,
+      "price": 12,
+      "priceSource": "offer",
+      "checkLabel": false,
+      "buyBefore": null,
+      "buyEarly": false
+    },
+    {
+      "productId": "16997",
+      "section": "kolonial",
+      "item": "Røde kidneybønner",
+      "packageSize": "240 g",
+      "packageAmount": 240,
+      "unit": "g",
+      "usedAmount": 480,
+      "packages": 2,
+      "price": 15,
+      "priceSource": "regular",
+      "checkLabel": false,
+      "buyBefore": null,
+      "buyEarly": false
+    }
+  ],
+  "totalPurchaseCost": 341.4,
+  "leftovers": [
+    {
+      "productId": "14875",
+      "item": "Hvidløg",
+      "amount": 165,
+      "unit": "g",
+      "value": 11.96
+    },
+    {
+      "productId": "15775",
+      "item": "Kartofler",
+      "amount": 850,
+      "unit": "g",
+      "value": 10.2
+    },
+    {
+      "productId": "15734",
+      "item": "Løg",
+      "amount": 1700,
+      "unit": "g",
+      "value": 10.2
+    },
+    {
+      "productId": "17319",
+      "item": "Peberfrugter",
+      "amount": 100,
+      "unit": "g",
+      "value": 4
+    },
+    {
+      "productId": "9725",
+      "item": "Gulerødder",
+      "amount": 150,
+      "unit": "g",
+      "value": 1.8
+    }
+  ],
+  "leftoverValue": 38.16,
+  "buyNote": null
+}

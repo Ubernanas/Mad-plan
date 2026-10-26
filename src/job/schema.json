@@ -1,0 +1,163 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "storeReason",
+    "dietRespected",
+    "dishes",
+    "notes"
+  ],
+  "properties": {
+    "storeReason": {
+      "type": "string"
+    },
+    "dietRespected": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "dishes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "description",
+          "suggested",
+          "servings",
+          "timeMinutes",
+          "steps",
+          "ingredients"
+        ],
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "suggested": {
+            "type": "boolean"
+          },
+          "servings": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "timeMinutes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ingredients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "qty",
+                "unit",
+                "checkLabel"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "qty": {
+                  "type": "number"
+                },
+                "unit": {
+                  "type": "string",
+                  "enum": [
+                    "g",
+                    "ml",
+                    "stk"
+                  ]
+                },
+                "productId": {
+                  "type": "string"
+                },
+                "basis": {
+                  "type": "boolean"
+                },
+                "checkLabel": {
+                  "type": "boolean"
+                },
+                "kitchenItem": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "kitchen": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "qty",
+          "unit",
+          "location",
+          "category"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "g",
+              "ml",
+              "stk"
+            ]
+          },
+          "location": {
+            "type": "string",
+            "enum": [
+              "køl",
+              "frost",
+              "skab"
+            ]
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "fisk",
+              "hakket",
+              "kød",
+              "grønt",
+              "køl",
+              "holdbart",
+              "frost"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

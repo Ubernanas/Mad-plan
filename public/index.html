@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#fff4ec" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#241b2c" media="(prefers-color-scheme: dark)">
+  <title>Madplan</title>
+  <link rel="stylesheet" href="/app.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <main id="app" aria-live="polite"></main>
+
+  <div id="undo" class="undo" role="status" hidden>
+    <span id="undo-text"></span>
+    <button id="undo-button" type="button">Fortryd</button>
+  </div>
+
+  <nav class="tabs" aria-label="Faner">
+    <a href="#/i-dag" data-tab="i-dag">I dag</a>
+    <a href="#/uge" data-tab="uge">Uge</a>
+    <a href="#/indkob" data-tab="indkob">Indkøb</a>
+    <a href="#/koekken" data-tab="koekken">Køkken</a>
+  </nav>
+</body>
+</html>
