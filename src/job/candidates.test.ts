@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { loadIngredientRules } from "../config.ts";
 import type { GomaProduct } from "../fetch/goma.ts";
 import type { Protein, Recipe } from "../recipes.ts";
-import { chooseQueries, coverage, offerWeights, queriesOf, ruleFor, selectCandidates } from "./candidates.ts";
+import { chooseQueries, coverage, makeable, offerWeights, queriesOf, ruleFor, selectCandidates } from "./candidates.ts";
 
 const rules = loadIngredientRules();
 const glutenAndLactoseFree = { glutenFree: true, lactoseFree: true, other: "" };
@@ -118,6 +118,14 @@ test("the same week gives the same candidates; another week mixes them different
   const ids = (seed: string) => selectCandidates(pool, rules, options({ seed })).map((r) => r.id).join();
   assert.equal(ids("2026-W45"), ids("2026-W45"));
   assert.notEqual(ids("2026-W45"), ids("2026-W46"));
+});
+
+test("a recipe is makeable when at most one side ingredient lacks a price, never its protein", () => {
+  const priced = new Set(["kylling", "ris", "løg"]);
+  assert.equal(makeable(recipe({ ingredients: ["chicken", "rice", "onion", "salt"] }), rules, noDiet, priced), true);
+  assert.equal(makeable(recipe({ ingredients: ["chicken", "rice", "lime", "salt"] }), rules, noDiet, priced), true);
+  assert.equal(makeable(recipe({ ingredients: ["chicken", "lime", "ginger", "salt"] }), rules, noDiet, priced), false);
+  assert.equal(makeable(recipe({ ingredients: ["shrimp", "rice", "onion", "salt"] }), rules, noDiet, priced), false);
 });
 
 test("search words: unpriced first, then the most needed, within the budget, never failed ones", () => {

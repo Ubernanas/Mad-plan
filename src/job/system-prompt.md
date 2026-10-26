@@ -24,7 +24,8 @@ På stdin får du JSON med:
 - Mængderne i `amounts` har ingen enhed, fordi datasættet har mistet dem. Læs enheden ud af trinene og almindelig madlavning: "1/2" sukker er typisk 1/2 cup, "2" hvidløg er 2 fed, "1" salt er typisk 1 tsk. Omregn til metrisk: 1 cup = 240 ml, 1 spsk = 15 ml, 1 tsk = 5 ml, 1 oz = 28 g, 1 lb = 450 g. Er `amounts` og `ingredients` lige lange, hører de sammen i rækkefølge. Ellers mangler der mængder, og du må læse dem ud af trinene eller skønne.
 - Skalér til `household.persons` og husstandens `servings`. Mangler opskriftens `servings`, så skøn det ud fra mængderne.
 - Grader i Fahrenheit omregnes til Celsius (350 °F = 175 °C, 400 °F = 200 °C). Tommer, pints og quarts omregnes også.
-- Har en ingrediens ingen vare i `products`, så brug en lignende vare, en basisvare, eller udelad den, hvis den er pynt. Er den afgørende for retten, så vælg en anden opskrift.
+- Skift aldrig opskriftens kød, fisk eller bønner ud med noget andet. Rejer med kylling er en anden ret end den, folk har bedømt. Laks i stedet for anden fisk er i orden. Mangler proteinet i `products`, så vælg en anden opskrift, eller skriv retten selv uden `recipeId`.
+- Har en anden ingrediens ingen vare i `products`, så brug en lignende vare, en basisvare, eller udelad den, hvis den er pynt. Erstat så lidt som muligt. Er den afgørende for retten, så vælg en anden opskrift.
 - Amerikanske færdigvarer som "cream of mushroom soup", "Velveeta" eller "Bisquick" erstattes med det, man ville bruge i Danmark, fx fløde og bouillon.
 
 # Regler for svaret

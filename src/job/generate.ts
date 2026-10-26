@@ -13,7 +13,10 @@ import type { LeafletInfo } from "../fetch/validity.ts";
 import { isExpired, listKitchen, replaceKitchen, todayIso, type KitchenItem } from "../kitchen.ts";
 import { loadRecipes, type Recipe } from "../recipes.ts";
 import { mondayOf, planWeek } from "../week.ts";
-import { computePlan, type ClaudeResponse, type Plan, type Product } from "./compute.ts";
+import { PROTEIN_PRODUCTS } from "./candidates.ts";
+import { computePlan, type ClaudeResponse, type Ingredient, type Plan, type Product } from "./compute.ts";
+
+const PROTEIN_NAMES: Record<keyof typeof PROTEIN_PRODUCTS, string> = { chicken: "kylling", beef: "oksekød", pork: "svinekød", fish: "fisk" };
 
 export const BASIS_ITEMS = ["olie", "salt", "peber", "tørre krydderier", "eddike", "sukker", "vand"];
 const JOB_FILES = import.meta.dirname;
@@ -208,6 +211,17 @@ export function validateResponse(
   for (const id of recipeIds) if (!recipes.has(id)) errors.push(`recipeId ${id} findes ikke i recipes.`);
   if (new Set(recipeIds).size !== recipeIds.length) errors.push("To retter har samme recipeId. Hver opskrift må kun bruges én gang.");
 
+  // Shrimp made with chicken is another dish than the one people rated; it may not carry the credit.
+  for (const dish of dishes) {
+    const recipe = dish.recipeId === undefined ? undefined : recipes.get(dish.recipeId);
+    const meats = recipe?.proteins.filter((p) => p !== "veg") as (keyof typeof PROTEIN_PRODUCTS)[] | undefined;
+    if (!recipe || !meats?.length) continue;
+    const used = dishProteins(dish.ingredients ?? [], products);
+    if (!meats.some((p) => used.has(p))) {
+      errors.push(`${dish.title}: opskriften "${recipe.name}" er med ${meats.map((p) => PROTEIN_NAMES[p]).join(" eller ")}, men retten har det ikke. Skift aldrig opskriftens protein. Vælg en anden opskrift, eller skriv retten selv uden recipeId.`);
+    }
+  }
+
   // What kitchenItem may point at: the kitchen we sent, or Claude's reading of the text.
   const available = new Map<string, { unit: Unit; qty: number }>();
   if ("text" in kitchen) {
@@ -264,6 +278,25 @@ export function validateResponse(
     }
   }
   return errors;
+}
+
+const DANISH_PROTEINS: [keyof typeof PROTEIN_PRODUCTS, RegExp][] = [
+  ["chicken", /kylling|kalkun/],
+  ["beef", /okse|bøf|kalv/],
+  ["pork", /svin|gris|flæsk|bacon|skinke|pølse|salsiccia|chorizo/],
+  ["fish", /laks|torsk|fisk|rejer|tun\b|sej\b|rødspætte|kuller/],
+];
+
+/** The proteins a dish uses: bought products by their search word or name, kitchen items by name. */
+function dishProteins(ingredients: Ingredient[], products: Map<string, Product>): Set<string> {
+  const found = new Set<string>();
+  for (const ing of ingredients) {
+    const product = ing.productId ? products.get(ing.productId) : undefined;
+    for (const [protein, queries] of Object.entries(PROTEIN_PRODUCTS)) if (product && queries.includes(product.query)) found.add(protein);
+    const name = `${product?.name ?? ""} ${ing.kitchenItem ? ing.name : ""}`.toLowerCase();
+    for (const [protein, re] of DANISH_PROTEINS) if (re.test(name)) found.add(protein);
+  }
+  return found;
 }
 
 /**

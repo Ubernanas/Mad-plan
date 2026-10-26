@@ -4,7 +4,7 @@
 
 import type { Household, IngredientRule } from "../config.ts";
 import type { GomaProduct } from "../fetch/goma.ts";
-import type { Protein, Recipe } from "../recipes.ts";
+import { proteinsOf, type Protein, type Recipe } from "../recipes.ts";
 
 type Diet = Household["diet"];
 export type Weights = Record<Protein, number>;
@@ -55,10 +55,29 @@ export function queriesOf(recipe: Recipe, rules: IngredientRule[], diet: Diet): 
   return [...queries];
 }
 
-/** The search words a recipe needs that have no price this week, fetched or from earlier weeks. */
-export function unpriced(recipe: Recipe, rules: IngredientRule[], diet: Diet, priced: Set<string>): string[] {
-  return queriesOf(recipe, rules, diet).filter((q) => !priced.has(q));
+/**
+ * Whether Claude can make the recipe as people rated it: at most one ingredient
+ * without a price, and never its meat, fish or beans, which would make it another dish.
+ */
+export function makeable(recipe: Recipe, rules: IngredientRule[], diet: Diet, priced: Set<string>): boolean {
+  let missing = 0;
+  for (const ingredient of recipe.ingredients) {
+    const rule = ruleFor(ingredient, rules);
+    const query = rule && queryFor(rule, diet);
+    if (!query || priced.has(query)) continue;
+    if (proteinsOf([ingredient]).length) return false;
+    missing++;
+  }
+  return missing <= 1;
 }
+
+/** The search words whose products count as each protein, so a dish keeps its recipe's protein. */
+export const PROTEIN_PRODUCTS: Record<Exclude<Protein, "veg">, string[]> = {
+  chicken: ["kylling"],
+  beef: ["hakket-oksekød", "oksekød"],
+  pork: ["svinekød", "hakket-svinekød", "bacon", "skinke", "pølser"],
+  fish: ["laks", "torsk", "rejer", "tun"],
+};
 
 /** Share of the ingredients the table knows how to buy. */
 export function coverage(recipe: Recipe, rules: IngredientRule[]): number {

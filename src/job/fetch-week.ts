@@ -9,7 +9,7 @@ import type { HttpClient } from "../fetch/http.ts";
 import { fetchLeaflet, type LeafletInfo } from "../fetch/validity.ts";
 import type { Recipe } from "../recipes.ts";
 import { mondayOf, planWeek, weekKey } from "../week.ts";
-import { chooseQueries, offerWeights, selectCandidates, unpriced } from "./candidates.ts";
+import { chooseQueries, makeable, offerWeights, selectCandidates } from "./candidates.ts";
 import { chooseStore, SourceChangedError, type StoreChoice } from "./store.ts";
 
 /** Goma pages per run, robots.txt and the store choice included (CLAUDE.md: about 25). */
@@ -92,9 +92,9 @@ export async function fetchWeek({
   setMeta(db, "emptyQueries", JSON.stringify(Object.fromEntries(failed)));
   if (empty.length) log(`Ingen varer for: ${empty.join(", ")}.`);
 
-  // Claude can only use what has a price, so keep the recipes missing at most one priced ingredient.
+  // Claude can only use what has a price, so keep the recipes it can make as they were rated.
   const priced = new Set([...items, ...queries, ...fresh].filter((q) => !missing.includes(q) && !empty.includes(q)));
-  const candidates = pool.filter((r) => unpriced(r, rules, diet, priced).length <= 1).slice(0, CANDIDATES);
+  const candidates = pool.filter((r) => makeable(r, rules, diet, priced)).slice(0, CANDIDATES);
   if (recipes.length) log(`${candidates.length} opskrifter at vælge imellem. Søgeord fra dem: ${queries.join(", ") || "ingen"}.`);
   setMeta(db, `candidates:${week}`, JSON.stringify(candidates.map((r) => r.id)));
 

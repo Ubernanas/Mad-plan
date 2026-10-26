@@ -116,6 +116,28 @@ test("recipeId must be one of the week's recipes, and each recipe is used once",
   assert.ok(errors.some((e) => e.startsWith("To retter har samme recipeId")), errors.join("\n"));
 });
 
+test("a dish may not swap its recipe's protein: shrimp made with chicken loses the recipe", () => {
+  const products = loadProducts(seededDb(), "2026-W43", "Netto", []);
+  const shrimp: Recipe = { ...bourbon, id: 7, name: "Cajun Sauteed Shrimp", proteins: ["fish"] };
+  const answer = good();
+  answer.dishes[2]!.recipeId = 7; // made with Kyllingebryst
+  const errors = validateResponse(answer, products, household, { items: [] }, new Map([[7, shrimp]]));
+  assert.ok(errors.some((e) => e.includes('"Cajun Sauteed Shrimp" er med fisk')), errors.join("\n"));
+  // The same dish with the chicken recipe is fine.
+  answer.dishes[2]!.recipeId = 1;
+  assert.deepEqual(validateResponse(answer, products, household, { items: [] }, new Map([[1, bourbon]])), []);
+});
+
+test("the recipe's protein may come from the kitchen", () => {
+  const products = loadProducts(seededDb(), "2026-W43", "Netto", []);
+  const burger: Recipe = { ...bourbon, id: 8, name: "Hamburgers", proteins: ["beef"] };
+  const kitchen = { items: [{ id: 3, name: "Hakket oksekød", qty: 300, unit: "g" as const, location: "frost" as const, expires: null, productId: null, source: null }] };
+  const answer = good();
+  answer.dishes[2]!.recipeId = 8;
+  answer.dishes[2]!.ingredients[0] = { name: "hakket oksekød", qty: 300, unit: "g", kitchenItem: "k3", checkLabel: false };
+  assert.deepEqual(validateResponse(answer, products, household, kitchen, new Map([[8, burger]])), []);
+});
+
 function seededDb() {
   const db = openDb(":memory:");
   seed(db);
