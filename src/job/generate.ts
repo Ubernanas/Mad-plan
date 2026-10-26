@@ -125,6 +125,15 @@ function useConvertedKitchen(db: DB, response: ClaudeResponse, today: string): v
   }
 }
 
+/**
+ * How many dishes must come from the week's recipes: all but 2 (10 of 12), so Claude
+ * can still meet a wish or use the kitchen. Only when there are at least as many
+ * recipes as dishes; in a thin week Claude may write more itself.
+ */
+export function minRecipeDishes(dishOptions: number, candidates: number): number {
+  return candidates >= dishOptions ? Math.max(0, dishOptions - 2) : 0;
+}
+
 /** The recipes Sunday's fetch chose for Claude, by id. Empty for weeks fetched before there were recipes. */
 export function loadCandidates(db: DB, week: string, recipes?: Recipe[]): Map<number, Recipe> {
   const ids = JSON.parse(getMeta(db, `candidates:${week}`) ?? "[]") as number[];
@@ -171,6 +180,7 @@ export function buildPrompt(week: string, store: string, household: Household, w
     `Foreslå ${household.dishOptions} retter, og markér de ${household.dinnersPerWeek}, du anbefaler, til ${household.persons} personer. Budget: ca. ${household.weeklyBudgetDkk} kr.`,
     wishes.trim() ? `Ønsker til ugen: ${wishes.trim()}` : "",
     recipes ? `Vælg retterne blandt de ${recipes} opskrifter i recipes, og skriv kun selv en ret, hvis for få af dem passer.` : "",
+    minRecipeDishes(household.dishOptions, recipes) ? `Mindst ${minRecipeDishes(household.dishOptions, recipes)} af de ${household.dishOptions} retter skal komme fra recipes.` : "",
     "Varer, præferencer, ønsker og kosthensyn står i JSON på stdin.",
   ].filter(Boolean).join("\n");
 }
@@ -210,6 +220,10 @@ export function validateResponse(
   const recipeIds = dishes.flatMap((d) => (d.recipeId === undefined ? [] : [d.recipeId]));
   for (const id of recipeIds) if (!recipes.has(id)) errors.push(`recipeId ${id} findes ikke i recipes.`);
   if (new Set(recipeIds).size !== recipeIds.length) errors.push("To retter har samme recipeId. Hver opskrift må kun bruges én gang.");
+  const required = minRecipeDishes(household.dishOptions, recipes.size);
+  if (recipeIds.length < required) {
+    errors.push(`Kun ${recipeIds.length} retter kommer fra recipes. Mindst ${required} af de ${household.dishOptions} retter skal være opskrifter fra recipes med recipeId.`);
+  }
 
   // Shrimp made with chicken is another dish than the one people rated; it may not carry the credit.
   for (const dish of dishes) {

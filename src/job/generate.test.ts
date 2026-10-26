@@ -5,7 +5,7 @@ import { openDb, setMeta, type DB } from "../db.ts";
 import { listKitchen, replaceKitchen } from "../kitchen.ts";
 import type { Recipe } from "../recipes.ts";
 import type { ClaudeResponse } from "./compute.ts";
-import { buildPrompt, generatePlan, jobEnv, loadProducts, parseClaudeOutput, PlanError, validateResponse, type RunClaude } from "./generate.ts";
+import { buildPrompt, generatePlan, jobEnv, loadProducts, minRecipeDishes, parseClaudeOutput, PlanError, validateResponse, type RunClaude } from "./generate.ts";
 
 const FRIDAY = () => new Date("2026-10-23T12:00:00Z"); // plan week 2026-W43
 const SECTIONS: Record<string, Section> = { ris: "kolonial", kylling: "kød og fisk" };
@@ -136,6 +136,24 @@ test("the recipe's protein may come from the kitchen", () => {
   answer.dishes[2]!.recipeId = 8;
   answer.dishes[2]!.ingredients[0] = { name: "hakket oksekød", qty: 300, unit: "g", kitchenItem: "k3", checkLabel: false };
   assert.deepEqual(validateResponse(answer, products, household, kitchen, new Map([[8, burger]])), []);
+});
+
+test("all but 2 dishes come from the recipes, when there are enough of them", () => {
+  assert.equal(minRecipeDishes(12, 40), 10);
+  assert.equal(minRecipeDishes(12, 12), 10);
+  assert.equal(minRecipeDishes(12, 11), 0); // a thin week: Claude may write more itself
+  assert.equal(minRecipeDishes(2, 40), 0);
+
+  const products = loadProducts(seededDb(), "2026-W43", "Netto", []);
+  const three = new Map([1, 2, 3].map((id) => [id, { ...bourbon, id }] as const));
+  const answer = good(); // 3 dishes, none from the recipes
+  assert.ok(validateResponse(answer, products, household, { items: [] }, three)
+    .includes("Kun 0 retter kommer fra recipes. Mindst 1 af de 3 retter skal være opskrifter fra recipes med recipeId."));
+  answer.dishes[0]!.recipeId = 1;
+  assert.deepEqual(validateResponse(answer, products, household, { items: [] }, three), []);
+
+  assert.match(buildPrompt("2026-W45", "Netto", { ...household, dishOptions: 12 }, "", 40), /Mindst 10 af de 12 retter skal komme fra recipes/);
+  assert.doesNotMatch(buildPrompt("2026-W45", "Netto", { ...household, dishOptions: 12 }, "", 8), /Mindst/);
 });
 
 function seededDb() {

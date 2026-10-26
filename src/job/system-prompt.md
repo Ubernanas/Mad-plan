@@ -18,7 +18,7 @@ På stdin får du JSON med:
 ## Opskrifterne
 
 - Vælg retterne blandt `recipes`, og sæt `recipeId` til opskriftens `id`. Brug hver opskrift højst én gang.
-- Skriv kun selv en ret (uden `recipeId`), hvis for få opskrifter passer til varerne, kosthensynene eller ønskerne. Er `recipes` tom, skriver du alle retterne selv.
+- Skriv kun selv en ret (uden `recipeId`), hvis for få opskrifter passer til varerne, kosthensynene eller ønskerne. Prompten siger, hvor mange retter der mindst skal komme fra `recipes`; brug dine egne pladser til et ønske eller til at bruge køkkenet. Er `recipes` tom, skriver du alle retterne selv.
 - Bevar retten, som folk har bedømt den: dens sauce, krydderier, syre og tilbehør. Forenkl den ikke, og fjern ikke smag for at spare. Det er netop det, der gør retterne gode.
 - Oversæt til dansk: titel, trin og ingrediensnavne. Kendte navne må blive stående, fx "General Tso's kylling".
 - Mængderne i `amounts` har ingen enhed, fordi datasættet har mistet dem. Læs enheden ud af trinene og almindelig madlavning: "1/2" sukker er typisk 1/2 cup, "2" hvidløg er 2 fed, "1" salt er typisk 1 tsk. Omregn til metrisk: 1 cup = 240 ml, 1 spsk = 15 ml, 1 tsk = 5 ml, 1 oz = 28 g, 1 lb = 450 g. Er `amounts` og `ingredients` lige lange, hører de sammen i rækkefølge. Ellers mangler der mængder, og du må læse dem ud af trinene eller skønne.

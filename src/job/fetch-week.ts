@@ -16,6 +16,11 @@ import { chooseStore, SourceChangedError, type StoreChoice } from "./store.ts";
 const GOMA_PAGES = 24;
 /** Recipes Claude gets to choose among. */
 const CANDIDATES = 40;
+/**
+ * Recipes considered before prices are known. Many lack a price for some ingredient,
+ * so the pool is large enough that about 40 are left even in the first weeks.
+ */
+const POOL = 200;
 
 export type FetchSummary = {
   week: string;
@@ -76,11 +81,10 @@ export async function fetchWeek({
   }
 
   // The protein offers just fetched decide which recipes are worth cooking this week,
-  // and their ingredients decide what else to fetch. Twice as many as needed, because
-  // some will lack prices for their ingredients.
+  // and their ingredients decide what else to fetch.
   const diet = household.diet;
   const pool = selectCandidates(recipes, rules, {
-    weights: offerWeights(found, choice.store), diet, recent: recentRecipes(db, week), count: CANDIDATES * 2, seed: week,
+    weights: offerWeights(found, choice.store), diet, recent: recentRecipes(db, week), count: POOL, seed: week,
   });
   const failed = failedQueries(db, week);
   const fresh = freshQueries(db, week);

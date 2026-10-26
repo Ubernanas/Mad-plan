@@ -97,7 +97,7 @@ Godkendelse sker med `CLAUDE_CODE_OAUTH_TOKEN`, et 1-årigt token lavet lokalt m
 
 - `input.json` indeholder ugens produkter fra den valgte butik (`id`, `name`, `packageAmount`, `unit`, `price`, `onOffer`, `perKg`), præferencer, ønsker til ugen (`wishes`) og kosthensyn. Fra P3 også køkkenbeholdningen. Og ugens opskrifter (`recipes`) på engelsk, som søndagens hentning valgte.
 - Claude må kun bruge produkter fra `input.json`, basisvarer og (fra P3) køkkenvarer.
-- Læs `structured_output`, og valider: hver `productId` findes, mængderne er positive, enheden passer til produktet, der er præcis `dishOptions` forskellige retter, og præcis `dinnersPerWeek` har `suggested: true`. Hver `recipeId` er en af ugens opskrifter og bruges højst én gang. Ved fejl prøves én gang til. Fejler det igen, logges fejlen, og den forrige plan bliver stående.
+- Læs `structured_output`, og valider: hver `productId` findes, mængderne er positive, enheden passer til produktet, der er præcis `dishOptions` forskellige retter, og præcis `dinnersPerWeek` har `suggested: true`. Hver `recipeId` er en af ugens opskrifter og bruges højst én gang, og retten har opskriftens protein (købt eller fra køkkenet). Er der mindst `dishOptions` opskrifter, skal alle retter undtagen 2 have `recipeId` (10 af 12). Ved fejl prøves én gang til. Fejler det igen, logges fejlen, og den forrige plan bliver stående.
 - Exit code ≠ 0 eller fejltekst om login: log "token udløbet eller ugyldigt". Tokenet fornyes en gang om året. Udløbsdatoen står i `config/household.json`.
 - Planen laves højst et par gange om ugen. Forbruget tæller med i Pro-grænserne.
 
@@ -152,10 +152,10 @@ Der findes ikke et åbent API for danske tilbudsaviser. Gomas Data API kræver e
 
 ### Søgeord fra opskrifterne
 
-- Besparelsen på proteintilbuddene i den valgte butik afgør, hvilke 80 opskrifter der vælges: flest med proteinerne på tilbud, men nogle af hver slags. Gode bedømmelser, mange anmeldelser og kort tid trækker op; opskrifter fra de sidste 4 ugers planer og opskrifter med for mange gluten- eller laktose-ombytninger er ude.
+- Besparelsen på proteintilbuddene i den valgte butik afgør, hvilke 200 opskrifter der vælges (mange mangler pris på noget, så puljen er stor): flest med proteinerne på tilbud, men nogle af hver slags. Gode bedømmelser, mange anmeldelser og kort tid trækker op; opskrifter fra de sidste 4 ugers planer og opskrifter med for mange gluten- eller laktose-ombytninger er ude.
 - `config/ingredients.json` oversætter deres engelske ingredienser til Goma-søgeord (med glutenfri og laktosefri varianter) eller basisvarer. Første match vinder, så sammensatte ord står først.
 - Søgeord uden en pris fra de sidste 4 uger hentes først, derefter dem, flest opskrifter bruger, til siderne er brugt (24 i alt). Resten prissættes fra tidligere uger som skøn. Gav et ord 0 varer, springes det over i 8 uger.
-- De højst 40 opskrifter, der mangler pris på højst én ingrediens, gemmes i `meta` som `candidates:<uge>` til Claude.
+- De højst 40 opskrifter, der mangler pris på højst én ingrediens, og aldrig på kød, fisk eller bønner, gemmes i `meta` som `candidates:<uge>` til Claude.
 
 ### Høflighed
 
@@ -183,7 +183,7 @@ Giver en proteinsøgning 0 rækker, eller giver over halvdelen af den faste list
 - Kilden er Kaggle-datasættet "Food.com - Recipes and Reviews" (irkaal, CC0, 522.517 opskrifter). Det hentes i hånden som `datasets/recipes.csv`; `npm run import-recipes` filtrerer det til `recipes/foodcom.json.gz`.
 - Filteret: mindst 4,5 stjerner og 10 anmeldelser, højst 75 minutter, 4-16 ingredienser, 2-14 trin, et protein, og ingen desserter, brød, drikke, morgenmad, tilbehør, marinader, dips eller saucer. Ved samme navn beholdes den med flest anmeldelser.
 - Datasættet har mistet enhederne ("1/2", ikke "1/2 cup"), og mængderne passer ikke altid til ingredienserne. Begge lister gemmes, som de er, og Claude læser enhederne ud af trinene.
-- Claude oversætter til dansk og metrisk, skalerer, laver glutenfri og laktosefri varianter og bevarer saucer og krydderier. Siden viser "Efter <navn> fra Food.com · 4,8 ★ (123 anmeldelser)".
+- Claude oversætter til dansk og metrisk, skalerer, laver glutenfri og laktosefri varianter og bevarer saucer og krydderier. Opskriftens protein byttes aldrig (rejer med kylling er en anden ret); laks for anden fisk er i orden. Claude skriver højst 2 retter selv, når der er opskrifter nok. Siden viser "Efter <navn> fra Food.com · 4,8 ★ (123 anmeldelser)".
 
 ### Kosthensyn
 
