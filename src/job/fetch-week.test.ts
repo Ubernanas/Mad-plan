@@ -35,7 +35,6 @@ const household: Household = {
   stores: ["Netto", "REMA 1000"],
   storeMode: "fixed",
   fixedStore: "Netto",
-  fetchCron: "0 14 * * 0",
   planCron: "0 18 * * 0",
   timezone: "Europe/Copenhagen",
   oauthTokenExpires: "2027-10-01",

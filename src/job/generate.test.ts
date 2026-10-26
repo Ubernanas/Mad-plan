@@ -14,7 +14,7 @@ const household: Household = {
   persons: 2, weeklyBudgetDkk: 460, dinnersPerWeek: 2, dishOptions: 3,
   diet: { glutenFree: true, lactoseFree: true, other: "" },
   stores: ["Netto"], storeMode: "cheapest", fixedStore: null,
-  fetchCron: "0 14 * * 0", planCron: "0 18 * * 0", timezone: "Europe/Copenhagen", oauthTokenExpires: "2027-10-01",
+  planCron: "0 18 * * 0", timezone: "Europe/Copenhagen", oauthTokenExpires: "2027-10-01",
 };
 
 function seed(db: DB, week = "2026-W43", missing: string[] = []) {

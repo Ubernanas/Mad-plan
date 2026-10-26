@@ -9,9 +9,8 @@ import type { HttpClient } from "../fetch/http.ts";
 import { fetchLeaflet, type LeafletInfo } from "../fetch/validity.ts";
 import type { Recipe } from "../recipes.ts";
 import { mondayOf, planWeek, weekKey } from "../week.ts";
-import { isExpired, listKitchen, todayIso } from "../kitchen.ts";
+import { getKitchenDraft, isExpired, listKitchen, todayIso } from "../kitchen.ts";
 import { chooseQueries, kitchenStock, offerWeights, selectMains, selectSides, type KitchenStock } from "./candidates.ts";
-import { getKitchenDraft } from "./plan-job.ts";
 import { chooseStore, SourceChangedError, type StoreChoice } from "./store.ts";
 
 /** Goma pages per run, robots.txt and the store choice included (CLAUDE.md: about 25). */

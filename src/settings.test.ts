@@ -8,7 +8,7 @@ const defaults: Household = {
   persons: 2, weeklyBudgetDkk: 460, dinnersPerWeek: 7, dishOptions: 12,
   diet: { glutenFree: true, lactoseFree: true, other: "" },
   stores: ["Netto", "Føtex", "Bilka", "REMA 1000"], storeMode: "cheapest", fixedStore: null,
-  fetchCron: "0 14 * * 0", planCron: "0 18 * * 0", timezone: "Europe/Copenhagen", oauthTokenExpires: "2027-10-23",
+  planCron: "0 18 * * 0", timezone: "Europe/Copenhagen", oauthTokenExpires: "2027-10-23",
 };
 
 test("without saved settings, household.json decides", () => {
@@ -22,7 +22,7 @@ test("saved settings override household.json, one field at a time", () => {
   const household = effectiveHousehold(db, defaults);
   assert.equal(household.weeklyBudgetDkk, 500);
   assert.deepEqual(household.diet, { glutenFree: true, lactoseFree: false, other: "" });
-  assert.equal(household.fetchCron, "0 14 * * 0"); // not a setting
+  assert.equal(household.planCron, "0 18 * * 0"); // not a setting
 });
 
 test("store mode: a fixed store must be one of the configured stores", () => {

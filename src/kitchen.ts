@@ -5,7 +5,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Section } from "./config.ts";
-import type { DB } from "./db.ts";
+import { getMeta, setMeta, type DB } from "./db.ts";
 import type { Unit } from "./fetch/size.ts";
 import { buyKey } from "./job/compute.ts";
 
@@ -72,6 +72,17 @@ const toItem = (r: Row): KitchenItem => ({
 export function listKitchen(db: DB): KitchenItem[] {
   const rows = db.prepare("SELECT * FROM kitchen WHERE qty > 0 ORDER BY location, expires IS NULL, expires, name").all() as Row[];
   return rows.map(toItem);
+}
+
+const KITCHEN_DRAFT_KEY = "kitchenDraft";
+
+/** The Køkken page's text, if it was edited since the last plan. Empty means: use the kitchen as it is. */
+export function getKitchenDraft(db: DB): string {
+  return getMeta(db, KITCHEN_DRAFT_KEY) ?? "";
+}
+
+export function setKitchenDraft(db: DB, text: string): void {
+  setMeta(db, KITCHEN_DRAFT_KEY, text.trim().slice(0, 3000));
 }
 
 /** Fresh items past their last good day. Frozen and cupboard items are not checked. */

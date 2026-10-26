@@ -16,7 +16,6 @@ export type Household = {
   stores: string[];
   storeMode: "cheapest" | "fixed";
   fixedStore: string | null;
-  fetchCron: string;
   planCron: string;
   timezone: string;
   oauthTokenExpires: string;

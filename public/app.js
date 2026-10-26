@@ -396,21 +396,16 @@ function askForPlan() {
   });
 }
 
+/** "Lav planen" fetches the offers and recipes first, so it works whenever you are ready. */
 function planButton(label, primary) {
-  const t = today();
   const job = state?.job;
   if (planCountdown) return `<p class="notice">Planen laves om lidt …</p>`;
   if (job?.state === "running") {
-    return `<div class="card butter stack">${steamingPot()}<p style="text-align:center">Planen er på vej. Det tager et par minutter.</p></div>`;
+    return `<div class="card butter stack">${steamingPot()}
+      <p style="text-align:center">${esc(job.message || "Planen er på vej.")}</p>
+      <p class="small muted" style="text-align:center">Det tager 10-20 minutter. I kan lukke appen imens.</p></div>`;
   }
   const failed = job?.state === "failed" ? `<p class="notice warn">${esc(job.message)}</p>` : "";
-  if (!state?.fetches?.[t.planWeek]) {
-    const fetchJob = state?.fetchJob;
-    if (fetchJob?.state === "running") return `${failed}<p class="notice">Tilbuddene hentes nu. Det tager et par minutter.</p>`;
-    const fetchFailed = fetchJob?.state === "failed"
-      ? `<p class="notice warn">Tilbuddene kunne ikke hentes: ${esc(fetchJob.message)}</p>` : "";
-    return `${failed}${fetchFailed}<p class="muted">Tilbuddene for uge ${weekNumber(t.planWeek)} er ikke hentet endnu. De hentes søndag kl. 14.</p>`;
-  }
   const offline = !navigator.onLine;
   return `${failed}<button class="button${primary ? "" : " secondary"}" data-action="plan" ${offline ? "disabled" : ""}>${label}</button>
     ${offline ? `<p class="muted small">Kræver forbindelse.</p>` : ""}`;
@@ -437,6 +432,8 @@ function screenToday() {
       parts.push(`<section class="card butter stack">
         ${state.job?.state === "running" ? "" : steamingPot()}
         <h1>${t.hour < PLAN_HOUR ? `Planen for uge ${weekNumber(t.planWeek)} laves kl. ${PLAN_HOUR}` : `Planen for uge ${weekNumber(t.planWeek)} er ikke lavet endnu`}</h1>
+        <p class="muted">Skriv først, hvad I har i køkkenet, så vælges opskrifter, der bruger det. Ellers laves planen kl. ${PLAN_HOUR}.</p>
+        ${state.job?.state === "running" ? "" : `<a class="button secondary" href="#/koekken">Ret køkkenet først</a>`}
         ${wishesField()}
         ${planButton("Lav planen nu", true)}
       </section>`);
@@ -496,7 +493,7 @@ function screenToday() {
     parts.push(`<section class="card stack">
       <div class="empty-art">${icon("pot")}</div>
       <h1>Ingen plan for denne uge</h1>
-      <p class="muted">Planen laves søndag kl. ${PLAN_HOUR}, når tilbuddene er hentet.</p>
+      <p class="muted">Planen laves søndag kl. ${PLAN_HOUR}, hvis I ikke laver den før.</p>
       ${planButton("Lav planen nu", true)}
     </section>`);
   }
@@ -570,7 +567,7 @@ function screenWeek() {
     return `${gear}<section class="card stack">
       <div class="empty-art">${icon("pot")}</div>
       <h1>Ingen plan endnu</h1>
-      <p class="muted">Planen laves søndag kl. ${PLAN_HOUR}, når tilbuddene er hentet kl. 14.</p>
+      <p class="muted">Planen laves søndag kl. ${PLAN_HOUR}, hvis I ikke laver den før.</p>
       ${planButton("Lav planen nu", true)}
     </section>`;
   }

@@ -1,54 +1,22 @@
-// The two Sunday jobs: fetch offers at fetchCron (14:00) and make the plan at
-// planCron (18:00) unless one was already made with "Lav planen".
+// Sunday at planCron (18:00): fetch the offers and recipes and make the plan, unless
+// it was already made with "Lav planen". There is no separate fetch: "Lav planen"
+// fetches too, so the recipes are chosen with the kitchen as it is when you are ready.
 
 import cron from "node-cron";
-import { loadHousehold, loadIngredientRules, loadItems, type Household } from "./config.ts";
-import { getMeta, setMeta, type DB } from "./db.ts";
-import { createHttpClient } from "./fetch/http.ts";
-import { fetchWeek } from "./job/fetch-week.ts";
-import { startPlanJob, type JobStatus } from "./job/plan-job.ts";
-import { loadRecipes } from "./recipes.ts";
-import { effectiveHousehold } from "./settings.ts";
+import { loadHousehold, type Household } from "./config.ts";
+import type { DB } from "./db.ts";
+import { startPlanJob } from "./job/plan-job.ts";
 import { planWeek } from "./week.ts";
-
-const FETCH_KEY = "fetchJob";
-
-export function fetchJobStatus(db: DB): JobStatus {
-  const raw = getMeta(db, FETCH_KEY);
-  return raw ? (JSON.parse(raw) as JobStatus) : { state: "idle", message: "", at: "" };
-}
-
-function setFetchStatus(db: DB, state: JobStatus["state"], message: string): void {
-  setMeta(db, FETCH_KEY, JSON.stringify({ state, message, at: new Date().toISOString() }));
-}
-
-export async function runFetchJob(db: DB): Promise<void> {
-  setFetchStatus(db, "running", "");
-  try {
-    const summary = await fetchWeek({
-      db, http: createHttpClient({ db }), household: effectiveHousehold(db), items: loadItems(), recipes: loadRecipes(), rules: loadIngredientRules(),
-    });
-    const missing = summary.missing.length ? ` Skøn: ${summary.missing.length} søgeord.` : "";
-    console.log(`[cron] Hentet ${summary.saved} varer fra ${summary.choice.store} for ${summary.week} (${summary.pagesFetched} sider, ${summary.candidates.length} opskrifter).${missing}`);
-    setFetchStatus(db, "done", `${summary.saved} varer fra ${summary.choice.store}.${missing}`);
-  } catch (error) {
-    const message = (error as Error).message;
-    console.error(`[cron] Hentningen stoppede: ${message}`);
-    setFetchStatus(db, "failed", message);
-  }
-}
 
 export function planExists(db: DB, week: string): boolean {
   return db.prepare("SELECT 1 FROM plans WHERE week = ?").get(week) !== undefined;
 }
 
 export function startCron(db: DB, household: Household = loadHousehold()): void {
-  const options = { timezone: household.timezone };
-  cron.schedule(household.fetchCron, () => runFetchJob(db), options);
   cron.schedule(household.planCron, () => {
     const week = planWeek();
     if (planExists(db, week)) console.log(`[cron] Planen for ${week} er allerede lavet.`);
     else startPlanJob(db);
-  }, options);
-  console.log(`[cron] Henter "${household.fetchCron}" og laver plan "${household.planCron}" (${household.timezone}).`);
+  }, { timezone: household.timezone });
+  console.log(`[cron] Henter tilbud og laver planen "${household.planCron}" (${household.timezone}), hvis den ikke er lavet.`);
 }

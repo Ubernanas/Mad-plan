@@ -7,15 +7,15 @@ import { basicAuth } from "hono/basic-auth";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadHousehold } from "./config.ts";
-import { fetchJobStatus, startCron } from "./cron.ts";
+import { startCron } from "./cron.ts";
 import { effectiveHousehold, saveSettings, settingsOf } from "./settings.ts";
 import { getMeta, openDb, setMeta, type DB } from "./db.ts";
 import { DAYS, selectDishes, setDayStatus, slotOn, weekStarted, type DayStatus, type Plan } from "./job/compute.ts";
 import {
-  getKitchenDraft, getWishes, planJobStatus, resetInterruptedJob, setKitchenDraft, setWishes, startPlanJob,
+  getWishes, planJobStatus, resetInterruptedJob, setWishes, startPlanJob,
 } from "./job/plan-job.ts";
 import {
-  consume, freeze, freezeAlerts, kitchenText, listKitchen, restore, syncPurchase, todayIso, unfreeze, type Location, type Move,
+  consume, freeze, freezeAlerts, getKitchenDraft, kitchenText, listKitchen, restore, setKitchenDraft, syncPurchase, todayIso, unfreeze, type Location, type Move,
 } from "./kitchen.ts";
 import { mondayOf, planWeek, weekKey } from "./week.ts";
 
@@ -168,7 +168,6 @@ function state(db: DB) {
     fetches,
     checks: checksFor(db, plans.map((p) => p.id)),
     job: planJobStatus(db),
-    fetchJob: fetchJobStatus(db),
     wishes: getWishes(db),
     settings: settingsOf(effectiveHousehold(db)),
     stores: loadHousehold().stores,

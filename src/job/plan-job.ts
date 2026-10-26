@@ -1,9 +1,14 @@
 // Runs plan generation in the background, one at a time, and records how it
-// went so the page can show it. Used by "Lav planen" and (later) by cron.
+// went so the page can show it. Used by "Lav planen" and by the 18:00 cron.
 
-import { loadItemSections, loadPreferences } from "../config.ts";
+import { loadIngredientRules, loadItems, loadItemSections, loadPreferences } from "../config.ts";
 import { getMeta, setMeta, type DB } from "../db.ts";
+import { createHttpClient } from "../fetch/http.ts";
+import { getKitchenDraft, setKitchenDraft } from "../kitchen.ts";
+import { loadRecipes } from "../recipes.ts";
 import { effectiveHousehold } from "../settings.ts";
+import { planWeek } from "../week.ts";
+import { fetchWeek } from "./fetch-week.ts";
 import { generatePlan } from "./generate.ts";
 
 export type JobStatus = {
@@ -25,17 +30,6 @@ export function setWishes(db: DB, wishes: string): void {
   setMeta(db, WISHES_KEY, wishes.trim().slice(0, 1000));
 }
 
-const KITCHEN_DRAFT_KEY = "kitchenDraft";
-
-/** The Køkken page's text, if it was edited since the last plan. Empty means: use the kitchen as it is. */
-export function getKitchenDraft(db: DB): string {
-  return getMeta(db, KITCHEN_DRAFT_KEY) ?? "";
-}
-
-export function setKitchenDraft(db: DB, text: string): void {
-  setMeta(db, KITCHEN_DRAFT_KEY, text.trim().slice(0, 3000));
-}
-
 export function planJobStatus(db: DB): JobStatus {
   const raw = getMeta(db, KEY);
   return raw ? (JSON.parse(raw) as JobStatus) : { state: "idle", message: "", at: "" };
@@ -50,13 +44,37 @@ export function resetInterruptedJob(db: DB): void {
   if (planJobStatus(db).state === "running") setStatus(db, "failed", "Planen blev afbrudt, fordi serveren genstartede. Prøv igen.");
 }
 
-/** Starts the job unless one is running. Returns false if it was already running. */
-export function startPlanJob(db: DB, generate: typeof generatePlan = generatePlan): boolean {
+/**
+ * The week's offers and recipes, chosen with the kitchen as it is right now. Pages already
+ * fetched this week come from the cache, so pressing "Lav planen" again costs Goma little.
+ * Only on Fly (or with CRON=on), so a dev server never fetches from Goma.
+ */
+export async function fetchOffers(db: DB): Promise<void> {
+  if (!process.env.FLY_APP_NAME && process.env.CRON !== "on") return;
+  const summary = await fetchWeek({
+    db, http: createHttpClient({ db }), household: effectiveHousehold(db), items: loadItems(), recipes: loadRecipes(), rules: loadIngredientRules(),
+  });
+  console.log(`[plan] Hentet ${summary.saved} varer fra ${summary.choice.store} for ${summary.week} (${summary.pagesFetched} sider, ${summary.candidates.length} opskrifter).`);
+}
+
+/**
+ * Starts the job unless one is running: first the offers and recipes, then Claude.
+ * Returns false if it was already running.
+ */
+export function startPlanJob(db: DB, generate: typeof generatePlan = generatePlan, fetch: typeof fetchOffers = fetchOffers): boolean {
   if (running) return false;
   running = true;
-  setStatus(db, "running", "");
+  setStatus(db, "running", "Henter tilbud og opskrifter …");
   void (async () => {
     try {
+      try {
+        await fetch(db);
+      } catch (error) {
+        // An earlier fetch this week still makes a plan; without one there is nothing to plan from.
+        if (!db.prepare("SELECT 1 FROM fetches WHERE week = ?").get(planWeek())) throw error;
+        console.error(`[plan] Tilbuddene kunne ikke hentes igen; bruger de hentede: ${(error as Error).message}`);
+      }
+      setStatus(db, "running", "Claude sætter ugens retter sammen …");
       const wishes = getWishes(db);
       const kitchenText = getKitchenDraft(db);
       const { plan } = await generate({

@@ -6,8 +6,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { loadItemSections, loadPreferences } from "../src/config.ts";
 import { openDb } from "../src/db.ts";
 import { generatePlan, type RunClaude } from "../src/job/generate.ts";
-import { getKitchenDraft, getWishes, setKitchenDraft, setWishes } from "../src/job/plan-job.ts";
-import { listKitchen } from "../src/kitchen.ts";
+import { getWishes, setWishes } from "../src/job/plan-job.ts";
+import { getKitchenDraft, listKitchen, setKitchenDraft } from "../src/kitchen.ts";
 import { effectiveHousehold } from "../src/settings.ts";
 
 try {

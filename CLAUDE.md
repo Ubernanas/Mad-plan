@@ -4,9 +4,9 @@ Personligt system, der hver uge henter tilbud fra de butikker, vi handler i, og 
 
 ## Hvad det gør (når alle faser er bygget)
 
-1. **Søndag kl. 14 (Europe/Copenhagen)** henter koden ugens tilbud og priser fra Goma og gemmer dem i SQLite. Den vælger de bedst bedømte hovedretter og tilbehør fra Food.com-datasættet (proteiner på tilbud får flere pladser), og deres ingredienser bestemmer, hvilke varer der hentes.
-2. **Valgfrit (P3):** mellem kl. 14 og 18 kan vi rette, hvad vi har i køkkenet, og trykke "Lav planen".
-3. **Søndag kl. 18** laves planen automatisk, hvis den ikke allerede er lavet. `claude -p` sætter `dishOptions` aftensmåltider (standard 12) sammen af en hovedret og et tilbehør, oversætter og tilpasser dem og anbefaler `dinnersPerWeek` af dem. Koden bygger indkøbslisten og regner alle priser ud.
+1. **Søndag, når vi er klar,** retter vi evt. køkkenet og trykker "Lav planen". Koden henter ugens tilbud og priser fra Goma og gemmer dem i SQLite. Den vælger de bedst bedømte hovedretter og tilbehør fra Food.com-datasættet (proteiner på tilbud får flere pladser), og deres ingredienser bestemmer, hvilke varer der hentes.
+2. **Valgfrit (P3):** før vi trykker, kan vi skrive, hvad vi har i køkkenet; opskrifterne vælges så, så de bruger det.
+3. **Søndag kl. 18 (Europe/Copenhagen)** sker det samme automatisk, hvis planen ikke allerede er lavet. Når tilbuddene er hentet, sætter `claude -p` `dishOptions` aftensmåltider (standard 12) sammen af en hovedret og et tilbehør, oversætter og tilpasser dem og anbefaler `dinnersPerWeek` af dem. Koden bygger indkøbslisten og regner alle priser ud.
 4. Planen vises på en mobilvenlig webside med ugens retter og en indkøbsliste, vi begge kan krydse af. Claudes anbefalede retter er valgt på forhånd, men vi kan selv vælge andre blandt forslagene.
 
 ## Faser
@@ -267,7 +267,6 @@ Køkkenbeholdningen er et **skøn**, ikke et præcist lager. Vi registrerer ikke
   "stores": ["Netto", "Føtex", "Bilka", "REMA 1000"],
   "storeMode": "cheapest",
   "fixedStore": null,
-  "fetchCron": "0 14 * * 0",
   "planCron": "0 18 * * 0",
   "timezone": "Europe/Copenhagen",
   "oauthTokenExpires": "YYYY-MM-DD"

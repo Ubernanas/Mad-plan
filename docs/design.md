@@ -66,7 +66,7 @@ Viser kun det, der er relevant lige nu, i denne rækkefølge, og skjuler det, de
 
 ### Uge
 
-- **Øverst:** indkøbspris mod budget, fx "464 kr. af 460 kr.", og fra P2 "Rester for 52 kr.". Butik og "tilbud hentet søndag kl. 14".
+- **Øverst:** indkøbspris mod budget, fx "464 kr. af 460 kr.", og fra P2 "Rester for 52 kr.". Butik og hvornår tilbuddene blev hentet, fx "tilbud hentet søndag kl. 16.40".
 - **Liste:** 7 rækker med dag, ret, pris pr. portion og status (P2: lavet ✓, sprunget over, i dag).
 - Tryk på en ret åbner opskriften.
 - **Vælg retter (7 af 12)** åbner valget: alle Claudes forslag med en sætning, tid og pris pr. portion. Claudes anbefalede er valgt på forhånd og mærket "Forslag". Tryk på en ret vælger eller fravælger den, og indkøbspris mod budget opdateres med det samme. Højst så mange retter, som der er aftener. Kan fortrydes. Knappen forsvinder, når ugen er gået i gang (en ret er lavet eller en dag sprunget over).
