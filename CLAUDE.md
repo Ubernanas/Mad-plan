@@ -43,6 +43,10 @@ Byg én fase ad gangen. Gå først videre, når fasen har kørt et par søndage.
 
 Claudes egne opskrifter var for kedelige (ingen saucer, lidt sjæl), så retterne kommer nu fra rigtige, bedømte opskrifter. Systemet er **måltid først**: gode, hele aftensmåltider vælges først, tilbud er et hensyn, og en ingrediens uden pris kommer på listen som "pris ukendt" i stedet for at udelukke retten. Se "Opskrifterne" nedenfor.
 
+### Næste: datamodel v2
+
+Planen står i `docs/data-model-v2.md`: canonical items, prislog og opskrifter, der oversættes én gang. Følg dens trin i rækkefølge, og reglerne i "Data og opdateringer".
+
 ### Ikke i nogen fase
 
 Brugerkonti, flere husstande, notifikationer, bedømmelse af retter, byt én ret med et nyt Claude-kald (valg blandt forslagene dækker behovet), native app. Senere features står i `docs/ideer.md`: lagerkøb og "planlæg resten af ugen igen". Køleskabsskærmen (`#/skaerm`) er bygget. Byg dem ikke, men design datamodellen, så de kan tilføjes: gem kilopriser, og giv `kitchen`-tabellen mængde, enhed, placering (køl, frost, skab) og holdbarhed fra start.
@@ -287,6 +291,20 @@ Køkkenbeholdningen er et **skøn**, ikke et præcist lager. Vi registrerer ikke
 - Secrets: `CLAUDE_CODE_OAUTH_TOKEN`, `BASIC_AUTH_USER`, `BASIC_AUTH_PASS`, `CONTACT_EMAIL`.
 - Mindst 1 GB RAM, da Claude Code kører i containeren.
 - `GET /health` til Fly health check.
+
+## Data og opdateringer
+
+Databasen på Fly er vores rigtige data: planer, flueben, dagstatus og køkkenet. Den kan ikke genskabes. Ingen opdatering må forstyrre den.
+
+- **En plan er et øjebliksbillede.** `plan_json` indeholder alt, siden skal bruge. Ændr aldrig en eksisterende plans `plan_json` uden om appens egne handlinger (valg af retter, dagstatus). En ny datastruktur bruges først fra næste plan; ugen, der er i gang, kører færdig på den gamle.
+- **Lav aldrig en ny plan for den igangværende uge** (fx ved at starte planjobbet over ssh) uden et klart ja fra os. Den erstatter planen, vi handler og laver mad efter, og flueben og "Lavet" følger ikke med.
+- **Kun tilføjende ændringer af skemaet.** Nye tabeller og kolonner (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN` med standardværdi). Aldrig `DROP`, `RENAME` eller `DELETE` på `plans`, `checks`, `kitchen`, `products`, `fetches` eller `meta`-nøgler, der er i brug. Skal noget gammelt væk, gøres det i en senere, separat ændring, når det nye har kørt et par uger.
+- **Flyt data ved at kopiere, ikke flytte.** En migrering læser fra de gamle tabeller og skriver til nye; de gamle står urørt, så vi kan gå tilbage.
+- **Backup før hver deploy, der rører databasen eller dens indhold:** kopiér `/data/madplan.db` til `/data/backups/madplan-<dato>.db` med SQLites backup (fx `better-sqlite3`'s `db.backup()`, så WAL kommer med), og tjek, at kopien kan åbnes. Behold de seneste 8.
+- **Test migreringen mod en kopi af den rigtige database først:** hent en backup ned, kør den nye kode mod den lokalt, og tjek, at den igangværende plan, flueben og køkkenet stadig vises rigtigt, før der deployes.
+- **Ingen skrivning i produktionsdatabasen over ssh.** Kun læsning til fejlfinding. Rettelser af data sker med kode, der er testet.
+- **Siden skal kunne vise gamle planer.** `app.js` håndterer felter fra tidligere versioner (fx `source` fra før `sources`), så en ny version aldrig gør en gemt plan ulæselig.
+- **Gendannelse:** stop maskinen, kopiér den seneste backup over `/data/madplan.db`, og start igen. Tidspunktet for backuppen skrives i commit-beskeden for deployen.
 
 ## Design
 
