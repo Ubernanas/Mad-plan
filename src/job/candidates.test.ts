@@ -22,7 +22,13 @@ test("the word table buys the right thing, also where words overlap", () => {
     ["egg noodles", "nudler"],
     ["eggs", "æg"],
     ["corn tortillas", "majstortillas"],
-    ["cornstarch", "majsstivelse"],
+    ["cornstarch", "maizena"],
+    ["thai red curry paste", "rød-karry"],
+    ["green curry paste", "karry"],
+    ["curry powder", "basis"],
+    ["leeks", "porrer"],
+    ["black beans", "bønner"],
+    ["soy sauce", "soyasauce"],
     ["frozen corn", "majs"],
     ["red pepper flakes", "basis"],
     ["red bell pepper", "peberfrugt"],
@@ -54,11 +60,11 @@ test("the word table buys the right thing, also where words overlap", () => {
 });
 
 test("the diet picks the gluten- or lactose-free variant", () => {
-  const recipe = { ingredients: ["spaghetti", "heavy cream", "soy sauce", "salt"] } as Recipe;
-  assert.deepEqual(queriesOf(recipe, rules, { diet: glutenAndLactoseFree }), ["glutenfri-pasta", "laktosefri-fløde", "tamari"]);
-  assert.deepEqual(queriesOf(recipe, rules, { diet: noDiet }), ["pasta", "fløde", "soja"]);
+  const recipe = { ingredients: ["spaghetti", "heavy cream", "flour", "salt"] } as Recipe;
+  assert.deepEqual(queriesOf(recipe, rules, { diet: glutenAndLactoseFree }), ["glutenfri-pasta", "laktosefri-fløde", "glutenfri-mel"]);
+  assert.deepEqual(queriesOf(recipe, rules, { diet: noDiet }), ["pasta", "fløde", "hvedemel"]);
   // Goma has no page for the variant: the plain word's page lists it too.
-  assert.deepEqual(queriesOf(recipe, rules, { diet: glutenAndLactoseFree, failed: new Set(["glutenfri-pasta", "laktosefri-fløde"]) }), ["pasta", "fløde", "tamari"]);
+  assert.deepEqual(queriesOf(recipe, rules, { diet: glutenAndLactoseFree, failed: new Set(["glutenfri-pasta", "laktosefri-fløde"]) }), ["pasta", "fløde", "glutenfri-mel"]);
 });
 
 test("the household's own swap comes before the diet variant: coconut milk for cream", () => {
@@ -160,7 +166,7 @@ test("search words: unpriced first, then the most needed, within the budget, nev
     diet: noDiet, fixed: ["kylling", "svinekød"], budget: 3, fresh: new Set(["gulerødder"]), failed: new Set(["honning"]),
   });
   // Carrots are needed most but priced from last week, so lime, ginger and soy go first.
-  assert.deepEqual(result, { queries: ["lime", "ingefær", "soja"], unfetched: ["gulerødder"] });
+  assert.deepEqual(result, { queries: ["lime", "ingefær", "soyasauce"], unfetched: ["gulerødder"] });
   assert.deepEqual(chooseQueries(candidates, rules, {
     diet: noDiet, fixed: [], budget: -2, fresh: new Set(), failed: new Set(),
   }).queries, []);

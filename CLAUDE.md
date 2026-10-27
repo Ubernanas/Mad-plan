@@ -304,7 +304,7 @@ Databasen på Fly er vores rigtige data: planer, flueben, dagstatus og køkkenet
 - **Test migreringen mod en kopi af den rigtige database først:** hent en backup ned, kør den nye kode mod den lokalt, og tjek, at den igangværende plan, flueben og køkkenet stadig vises rigtigt, før der deployes.
 - **Ingen skrivning i produktionsdatabasen over ssh.** Kun læsning til fejlfinding. Rettelser af data sker med kode, der er testet.
 - **Siden skal kunne vise gamle planer.** `app.js` håndterer felter fra tidligere versioner (fx `source` fra før `sources`), så en ny version aldrig gør en gemt plan ulæselig.
-- **Gendannelse:** stop maskinen, kopiér den seneste backup over `/data/madplan.db`, og start igen. Tidspunktet for backuppen skrives i commit-beskeden for deployen.
+- **Gendannelse:** stop maskinen, slet `/data/madplan.db-wal` og `/data/madplan.db-shm` (ellers lægges den gamle WAL oven på backuppen), kopiér den seneste backup over `/data/madplan.db`, og start igen. Tidspunktet for backuppen skrives i commit-beskeden for deployen.
 
 ## Design
 

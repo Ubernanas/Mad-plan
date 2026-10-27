@@ -4,6 +4,8 @@
 set -eu
 
 mkdir -p /data/jobdir
+# A backup before the new code opens the database. A failure is logged, but the site still starts.
+node src/backup.ts || true
 chown -R node:node /data
 
 exec setpriv --reuid=node --regid=node --init-groups \

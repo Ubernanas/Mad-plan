@@ -739,7 +739,7 @@ function screenKitchen() {
       ${canPlan
         ? `<button class="button" data-action="kitchen-plan">Lav planen</button>`
         : `<button class="button secondary" data-action="kitchen-save">Gem teksten</button>`}
-      ${state.kitchenEdited ? `<button class="button secondary" data-action="kitchen-reset">Brug listen, som den står</button>` : ""}
+      ${state.kitchenEdited ? `<button class="button secondary" data-action="kitchen-reset">Kassér teksten</button>` : ""}
     </section>
     ${items.length ? kitchenGroups(items) : `<div class="section card stack"><div class="empty-art">${icon("fridge")}</div><p class="muted">Køkkenet er tomt. Varer kommer hertil, når I krydser af på indkøbslisten, eller når teksten ovenfor bruges.</p></div>`}
     <p class="section small muted">Køkkenet er et skøn. Frokoster og snacks bliver ikke talt med.</p>
@@ -1030,7 +1030,12 @@ document.addEventListener("click", (event) => {
       .then(() => (action === "kitchen-plan" ? askForPlan() : showUndo("Teksten er gemt. Den bruges, når planen laves.")))
       .catch((error) => showUndo(navigator.onLine ? error.message : "Kræver forbindelse."));
   } else if (action === "kitchen-reset") {
-    saveKitchenText("").then(() => showUndo("Listen bruges, som den står")).catch(() => showUndo("Kræver forbindelse."));
+    // The saved draft goes; undo puts it back.
+    const draft = state.kitchenText;
+    saveKitchenText("")
+      .then(() => showUndo("Teksten er kasseret. Listen nedenfor bruges.", () =>
+        saveKitchenText(draft).catch(() => showUndo("Det kunne ikke fortrydes. Kræver forbindelse."))))
+      .catch(() => showUndo("Kræver forbindelse."));
   } else if (action === "diet") {
     const key = target.dataset.key;
     const was = state.settings.diet[key];
