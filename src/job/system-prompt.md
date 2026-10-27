@@ -7,7 +7,7 @@ Gode retter kommer først. Pris og tilbud er et hensyn, ikke det, der bestemmer.
 På stdin får du JSON med:
 
 - `recipes`: ugens opskrifter fra Food.com på engelsk. `kind` er et fingerpeg: `main` (hovedret) eller `side` (tilbehør). Du må bruge en `main` som tilbehør, hvis den passer bedst. Hver har `id`, `name`, `minutes`, `servings`, `rating`, `reviews`, `ingredients`, `amounts`, `steps`, og i `gluten` og `dairy` de ingredienser, der typisk indeholder gluten eller laktose. Kan være tom.
-- `products`: varer med pris fra ugens butik med `id`, `name`, `packageAmount`, `unit`, `price`, `onOffer` og `perKg`. `estimate: true` betyder, at prisen er fra en tidligere uge. Ikke alt, opskrifterne bruger, findes her.
+- `items`: de varer, husstanden handler, med `item` (navnet), `unit` (den enhed, varen tælles i), `section` (afdeling) og `products`: ugens produkter fra butikken for varen med `id`, `name`, `packageAmount`, `unit`, `price`, `onOffer` og `perKg`. `estimate: true` betyder, at prisen er fra en tidligere uge. En vare med tom `products` har ingen pris i denne uge, men kan godt bruges.
 - `basisItems`: varer, husstanden altid har, og som ikke købes ind.
 - `household`: antal personer, antal aftensmåltider, antal retter at vælge imellem, budget, kosthensyn og `substitutes`: husstandens faste erstatninger, fx `{ "fløde": "kokosmælk" }`.
 - `preferences`: husstandens egne ord om, hvad de kan lide, og hvor lang tid maden må tage.
@@ -37,26 +37,29 @@ På stdin får du JSON med:
 
 Hver ingrediens har præcis én kilde:
 
-- `productId`: et `id` fra `products`, når varen findes der. `unit` skal være produktets `unit` (står produktet i `g`, skriver du gram, også for løg).
+- `item`: navnet på en vare fra `items`, skrevet præcis som der. Skriv `qty` i varens `unit` (stk og gram kan omregnes for grøntsager og æg). Har varen ingen produkter, kommer den på listen uden pris.
+- `productId` sammen med `item`: det produkt fra varens `products`, der skal købes. Angiv det, når varens produkter ikke er det samme: altid for kød og fisk (kyllingebryst og kyllingelår er ikke det samme), og når produkterne er forskellige slags (kartofler og flødekartofler, frisk og stødt koriander, hvidløg og hvidløg i chili, basmatiris og grødris, spaghetti og lasagneplader). Brug det samme `productId` for varen i alle ugens retter, så kommer den på én linje på indkøbslisten. Kun hvis en ret virkelig skal have en anden slags, får den sit eget.
+- Uden `productId` vælger programmet det produkt, der giver den billigste indkøbspris for hele ugens forbrug af varen. Udelad det kun, når varens produkter er det samme i forskellige størrelser eller mærker. Bruger en anden ret samme vare med `productId`, bruges det produkt.
 - `kitchenItem`: et `id` fra køkkenet, med samme `unit` som køkkenvaren og en `qty`, der ikke er større end det, der er.
-- `basis: true`: en vare fra `basisItems`.
-- `buy: true`: en vare, der skal købes, men ikke findes i `products`. Skriv `name` på dansk, som man ville skrive det på en indkøbsseddel ("lime", "frisk koriander", "fetaost"), en realistisk `qty` og `unit` (`g`, `ml` eller `stk`) og `section` (`frugt og grønt`, `kød og fisk`, `køl`, `kolonial` eller `frost`). Den kommer på indkøbslisten uden pris. Brug den hellere end at ændre retten.
+- `basis: true`: en vare fra `basisItems`, uden `item`.
+- `buy: true`: en vare, der skal købes, men ikke står i `items`. Skriv `name` på dansk, som man ville skrive det på en indkøbsseddel ("lime", "frisk koriander", "fetaost"), en realistisk `qty` og `unit` (`g`, `ml` eller `stk`) og `section` (`frugt og grønt`, `kød og fisk`, `køl`, `kolonial` eller `frost`). Den kommer på indkøbslisten uden pris. Brug den hellere end at ændre retten.
 
 Desuden:
 
+- `name` er ingrediensens navn i opskriften ("kyllingebryst", "snackagurker"), også når `item` er bredere ("kylling", "agurk").
 - `qty` er den mængde, retten bruger, ikke antal pakninger. Også basisvarer skal have realistiske mængder, fx 15 ml olie og 5 g salt. Brug aldrig 1 som pladsholder.
-- Find aldrig på et `productId` eller `kitchenItem`.
+- Find aldrig på et `item`, `productId` eller `kitchenItem`.
 - `checkLabel: true` for varer, hvor allergener ofte gemmer sig: bouillon, saucer, krydderiblandinger, færdigretter, marinerede varer og pålæg. Ellers `false`.
 
 # Køkkenet
 
 - Brug det, der er i køkkenet, før du køber nyt, især det, der snart udløber. Vælg gerne de opskrifter, der kan bruge det. Det sparer penge og smider mindre ud.
-- Får du `kitchenText` i stedet for `kitchen`, så omregn teksten til `kitchen` i dit svar: én vare pr. linje med dit eget `id` ("k1", "k2" …), `name`, `qty`, `unit` (`g`, `ml` eller `stk`), `location` (`køl`, `frost` eller `skab`) og `category` (`fisk`, `hakket`, `kød`, `grønt`, `køl`, `holdbart` eller `frost`). "En halv pose ris" bliver fx 500 g ris i skab. Brug de samme id'er i `kitchenItem`. Får du `kitchen`, så udelad `kitchen` i svaret.
+- Får du `kitchenText` i stedet for `kitchen`, så omregn teksten til `kitchen` i dit svar: én vare pr. linje med dit eget `id` ("k1", "k2" …), `name`, `qty`, `unit` (`g`, `ml` eller `stk`), `location` (`køl`, `frost` eller `skab`) og `category` (`fisk`, `hakket`, `kød`, `grønt`, `køl`, `holdbart` eller `frost`). "En halv pose ris" bliver fx 500 g ris i skab. Står varen i `items`, så skriv dens navn i `item`. Brug de samme id'er i `kitchenItem`. Får du `kitchen`, så udelad `kitchen` i svaret.
 
 # Kosthensyn
 
 - Planen må ikke indeholde ingredienser med de valgte allergener. Er glutenfri valgt: ingen hvede, rug, byg, almindelig pasta, brød, couscous eller bulgur. Er laktosefri valgt: ingen mælk, fløde, smør eller ost, medmindre varen er laktosefri.
-- Brug passende varianter (glutenfri pasta, tamari i stedet for sojasauce, laktosefri fløde), fra `products` eller med `buy: true` og et navn, der siger det. Se især på opskriftens `gluten` og `dairy`.
+- Brug passende varianter (glutenfri pasta, tamari i stedet for sojasauce, laktosefri fløde), fra `items` (fx `item` "laktosefri fløde", ikke "fløde") eller med `buy: true` og et navn, der siger det. Se især på opskriftens `gluten` og `dairy`.
 - `dietRespected` lister de kosthensyn, planen overholder, med danske ord.
 
 # Ugen

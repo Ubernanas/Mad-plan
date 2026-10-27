@@ -6,15 +6,17 @@ import { spawn } from "node:child_process";
 import { mkdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { SECTIONS, type Household, type Section } from "../config.ts";
+import { loadIngredientRules, SECTIONS, type Household, type IngredientRule, type Section } from "../config.ts";
 import { getMeta, setMeta, type DB } from "../db.ts";
 import type { Unit } from "../fetch/size.ts";
 import type { LeafletInfo } from "../fetch/validity.ts";
+import { itemFor, itemsFromRules, listItems, nameOfQuery, rememberNewItems, syncItems, type CanonicalItem } from "../items.ts";
 import { isExpired, listKitchen, replaceKitchen, todayIso, type KitchenItem } from "../kitchen.ts";
 import { loadRecipes, type Recipe } from "../recipes.ts";
+import { convert } from "../units.ts";
 import { mondayOf, planWeek } from "../week.ts";
 import { PROTEIN_PRODUCTS } from "./candidates.ts";
-import { computePlan, type ClaudeResponse, type Dish, type Plan, type Product } from "./compute.ts";
+import { computePlan, type ClaudeResponse, type Dish, type ItemUnit, type Plan, type Product } from "./compute.ts";
 
 export const BASIS_ITEMS = ["olie", "salt", "peber", "tørre krydderier", "eddike", "sukker", "vand"];
 const JOB_FILES = import.meta.dirname;
@@ -35,13 +37,15 @@ type Options = {
   kitchenText?: string;
   /** The recipe dataset; read from recipes/ when the week has candidates and none are given. */
   recipes?: Recipe[];
+  /** The word table the items come from; config/ingredients.json if not given. */
+  rules?: IngredientRule[];
   now?: () => Date;
   run?: RunClaude;
   log?: (message: string) => void;
 };
 
 export async function generatePlan({
-  db, household, sections, preferences, wishes = "", kitchenText = "", recipes, now = () => new Date(), run = runClaude, log = console.log,
+  db, household, sections, preferences, wishes = "", kitchenText = "", recipes, rules, now = () => new Date(), run = runClaude, log = console.log,
 }: Options): Promise<{ plan: Plan; response: ClaudeResponse }> {
   const week = planWeek(now());
   const fetch = db.prepare("SELECT store, savings_json, missing_json FROM fetches WHERE week = ?").get(week) as
@@ -49,7 +53,10 @@ export async function generatePlan({
     | undefined;
   if (!fetch) throw new PlanError(`Der er ikke hentet tilbud for ${week} endnu.`);
 
-  const products = loadProducts(db, week, fetch.store, JSON.parse(fetch.missing_json) as string[]);
+  const catalog = itemsFromRules(rules ?? loadIngredientRules());
+  syncItems(db, catalog);
+  const products = loadProducts(db, week, fetch.store, JSON.parse(fetch.missing_json) as string[], catalog);
+  const items = weekItems(db, products, sections);
   const candidates = loadCandidates(db, week, recipes);
   const today = todayIso(now());
   // Either the kitchen as it stands (expired fresh items left out), or the household's own words about it.
@@ -72,7 +79,10 @@ export async function generatePlan({
     ...("text" in kitchen
       ? { kitchenText: kitchen.text }
       : { kitchen: kitchen.items.map((i) => ({ id: `k${i.id}`, name: i.name, qty: i.qty, unit: i.unit, location: i.location, expires: i.expires })) }),
-    products: [...products.values()].map(({ query, estimate, ...p }) => (estimate ? { ...p, estimate } : p)),
+    items: [...items].map(([item, { unit, section, products: own }]) => ({
+      item, unit, section,
+      products: own.map(({ query, estimate, item: _, ...p }) => (estimate ? { ...p, estimate } : p)),
+    })),
     recipes: [...candidates.values()].map(({ id, kind, name, minutes, servings, rating, reviews, ingredients, amounts, steps, gluten, dairy }) =>
       ({ id, kind, name, minutes, servings, rating, reviews, ingredients, amounts, steps, gluten, dairy })),
   });
@@ -86,14 +96,16 @@ export async function generatePlan({
     const result = await run(input, prompt + retryNote);
     const parsed = parseClaudeOutput(result);
     if ("loginError" in parsed) throw new PlanError(`token udløbet eller ugyldigt (claude: ${parsed.loginError})`);
-    errors = "error" in parsed ? [parsed.error] : validateResponse(parsed.response, products, household, kitchen, candidates);
+    if ("response" in parsed) dropStrayItems(parsed.response as ClaudeResponse);
+    errors = "error" in parsed ? [parsed.error] : validateResponse(parsed.response, products, household, kitchen, candidates, items);
     if (errors.length === 0 && "response" in parsed) {
       const response = parsed.response as ClaudeResponse;
+      normaliseItems(response, products);
       for (const dish of response.dishes) {
         const main = dish.recipeId === undefined ? undefined : candidates.get(dish.recipeId);
         const side = dish.sideRecipeId === undefined ? undefined : candidates.get(dish.sideRecipeId);
         // Shrimp made with chicken is another dish than the one people rated: it keeps its place, not the credit.
-        const honest = main && keepsProtein(dish, main, products);
+        const honest = main && keepsProtein(dish, main, products, catalog);
         if (main && !honest) log(`${dish.title}: har ikke proteinet fra "${main.name}", så den krediteres ikke.`);
         const used = [honest ? main : undefined, side].filter((r): r is Recipe => r !== undefined);
         if (used.length) dish.sources = used.map((r) => ({ name: r.name, rating: r.rating, reviews: r.reviews, url: `https://www.food.com/recipe/${r.id}` }));
@@ -105,10 +117,11 @@ export async function generatePlan({
         week, store: fetch.store, createdAt, weeklyBudgetDkk: household.weeklyBudgetDkk,
         dinnersPerWeek: household.dinnersPerWeek, wishes,
         leafletLastDay: leaflet?.store === fetch.store ? leaflet.lastDay : null,
-      });
+      }, Object.fromEntries([...items].map(([name, { section, unit }]): [string, ItemUnit] => [name, { section, unit }])));
       db.prepare("INSERT INTO plans (week, store, plan_json, created_at) VALUES (?, ?, ?, ?)").run(
         week, fetch.store, JSON.stringify(plan), createdAt,
       );
+      rememberNewItems(db, response.dishes.flatMap((d) => d.ingredients.filter((i) => i.buy)));
       return { plan, response };
     }
     log(`Forsøg ${attempt}: svaret blev afvist (${errors.length} fejl): ${errors.slice(0, 5).join("; ")}`);
@@ -141,12 +154,13 @@ export function loadCandidates(db: DB, week: string, recipes?: Recipe[]): Map<nu
   return new Map(ids.flatMap((id) => (byId.has(id) ? [[id, byId.get(id)!] as const] : [])));
 }
 
-/** This week's products, plus last known prices for search words that failed this week. */
-export function loadProducts(db: DB, week: string, store: string, missing: string[]): Map<string, Product> {
+/** This week's products, plus last known prices for search words that failed this week. With a catalog, each knows its item. */
+export function loadProducts(db: DB, week: string, store: string, missing: string[], catalog?: CanonicalItem[]): Map<string, Product> {
   type Row = { goma_id: string; name: string; query: string; package_amount: number; unit: Unit; price: number; on_offer: number; per_kg: number | null };
   const toProduct = (row: Row, estimate: boolean): Product => ({
     id: row.goma_id, name: row.name, query: row.query, packageAmount: row.package_amount, unit: row.unit,
     price: row.price, onOffer: !estimate && row.on_offer === 1, perKg: row.per_kg, estimate,
+    ...(catalog ? { item: itemFor(row.query, row.name, catalog)?.name ?? nameOfQuery(row.query) } : {}),
   });
   const columns = "goma_id, name, query, package_amount, unit, price, on_offer, per_kg";
 
@@ -161,6 +175,46 @@ export function loadProducts(db: DB, week: string, store: string, missing: strin
     for (const row of rows) if (!products.has(row.goma_id)) products.set(row.goma_id, toProduct(row, true));
   }
   return products;
+}
+
+/** An item as Claude gets it: how it is counted, where it goes on the list, and this week's products. */
+export type WeekItem = { unit: Unit; section: Section; products: Product[] };
+
+/** The items Claude may name, each with this week's products. One without products has no price this week. */
+export function weekItems(db: DB, products: Map<string, Product>, sections: Record<string, Section>): Map<string, WeekItem> {
+  const items = new Map<string, WeekItem>(listItems(db).map((i) => [i.name, { unit: i.unit, section: i.section, products: [] }]));
+  for (const product of products.values()) {
+    if (!product.item) continue;
+    const entry = items.get(product.item) ?? { unit: product.unit, section: sections[product.query] ?? "kolonial", products: [] };
+    entry.products.push(product);
+    items.set(product.item, entry);
+  }
+  // Counted the way most of this week's products are.
+  for (const entry of items.values()) {
+    const units = entry.products.map((p) => p.unit);
+    if (units.length) entry.unit = units.toSorted((a, b) => units.filter((u) => u === b).length - units.filter((u) => u === a).length)[0]!;
+  }
+  return items;
+}
+
+/** A basis or kitchen ingredient is not bought, so an item on it says nothing ("salt" is both). */
+function dropStrayItems(response: ClaudeResponse): void {
+  for (const dish of Array.isArray(response?.dishes) ? response.dishes : []) {
+    for (const ing of Array.isArray(dish?.ingredients) ? dish.ingredients : []) {
+      if (ing && (ing.basis === true || ing.kitchenItem !== undefined) && ing.productId === undefined) delete ing.item;
+    }
+  }
+}
+
+/** Item names as the items list writes them; a product given alone brings its item. */
+function normaliseItems(response: ClaudeResponse, products: Map<string, Product>): void {
+  for (const dish of response.dishes) {
+    for (const ing of dish.ingredients) {
+      const item = ing.item?.trim().toLowerCase() ?? (ing.productId ? products.get(ing.productId)?.item : undefined);
+      if (item) ing.item = item;
+      else delete ing.item;
+    }
+  }
 }
 
 export function buildPrompt(week: string, store: string, household: Household, wishes = "", hasRecipes = false): string {
@@ -209,6 +263,7 @@ export function validateResponse(
   household: Pick<Household, "dinnersPerWeek" | "dishOptions">,
   kitchen: KitchenSource = { items: [] },
   recipes: Map<number, Recipe> = new Map(),
+  items: Map<string, WeekItem> = new Map(),
 ): string[] {
   const response = value as ClaudeResponse;
   if (!response || !Array.isArray(response.dishes)) return ["Svaret har ingen dishes-liste."];
@@ -259,12 +314,25 @@ export function validateResponse(
       const label = `${where}, ${ing.name}`;
       if (!(Number.isFinite(ing.qty) && ing.qty > 0)) errors.push(`${label}: mængden skal være større end 0.`);
       const hasProduct = ing.productId !== undefined;
+      const hasItem = ing.item !== undefined;
       const fromKitchen = ing.kitchenItem !== undefined;
       const isBasis = ing.basis === true;
       const toBuy = ing.buy === true;
-      if ([hasProduct, fromKitchen, isBasis, toBuy].filter(Boolean).length !== 1) {
-        errors.push(`${label}: skal have præcis én kilde: productId, kitchenItem, basis eller buy.`);
+      if ([hasItem || hasProduct, fromKitchen, isBasis, toBuy].filter(Boolean).length !== 1) {
+        errors.push(`${label}: skal have præcis én kilde: item (evt. med productId), kitchenItem, basis eller buy.`);
         continue;
+      }
+      if (hasItem) {
+        const entry = items.get(ing.item!.trim().toLowerCase());
+        if (!entry) {
+          errors.push(`${label}: item "${ing.item}" findes ikke i items. Brug buy med section for noget, der ikke står der.`);
+        } else if (!hasProduct && entry.products.length) {
+          if (entry.section === "kød og fisk") {
+            errors.push(`${label}: kød og fisk skal have productId, så den rigtige udskæring bliver købt.`);
+          } else if (!entry.products.some((p) => convert(ing.qty, ing.unit, p.unit, p.name) !== null)) {
+            errors.push(`${label}: enheden skal være ${entry.unit} som varens produkter, ikke ${ing.unit}.`);
+          }
+        }
       }
       if (toBuy && !SECTIONS.includes(ing.section!)) {
         errors.push(`${label}: en vare med buy skal have section (${SECTIONS.join(", ")}).`);
@@ -277,9 +345,11 @@ export function validateResponse(
       }
       if (hasProduct) {
         const product = products.get(ing.productId!);
-        if (!product) errors.push(`${label}: productId ${ing.productId} findes ikke i products.`);
-        else if (product.unit !== ing.unit) {
+        if (!product) errors.push(`${label}: productId ${ing.productId} findes ikke blandt produkterne i items.`);
+        else if (convert(ing.qty, ing.unit, product.unit, product.name) === null) {
           errors.push(`${label}: enheden skal være ${product.unit} som produktet, ikke ${ing.unit}.`);
+        } else if (hasItem && product.item && product.item !== ing.item!.trim().toLowerCase()) {
+          errors.push(`${label}: produktet ${product.id} hører til ${product.item}, ikke ${ing.item}.`);
         }
       }
     }
@@ -290,7 +360,7 @@ export function validateResponse(
 const DANISH_PROTEINS: [keyof typeof PROTEIN_PRODUCTS, RegExp][] = [
   ["chicken", /kylling|kalkun/],
   ["beef", /okse|bøf|kalv/],
-  ["pork", /svin|gris|flæsk|bacon|skinke|pølse|salsiccia|chorizo/],
+  ["pork", /svin|gris|flæsk|bacon|skinke|pølse|salsiccia|chorizo|mørbrad|kotelet|nakke|medister/],
   ["fish", /laks|torsk|fisk|rejer|tun\b|sej\b|rødspætte|kuller/],
 ];
 
@@ -299,15 +369,16 @@ const DANISH_PROTEINS: [keyof typeof PROTEIN_PRODUCTS, RegExp][] = [
  * Only decides the credit, never whether the plan is accepted. Bought products count by
  * search word and name; kitchen items and items without a price by name.
  */
-function keepsProtein(dish: Dish, recipe: Recipe, products: Map<string, Product>): boolean {
+function keepsProtein(dish: Dish, recipe: Recipe, products: Map<string, Product>, catalog: CanonicalItem[]): boolean {
   const meats = recipe.proteins.filter((p) => p !== "veg");
   if (!meats.length) return true;
   const found = new Set<string>();
   for (const ing of dish.ingredients ?? []) {
     if (ing.basis) continue;
     const product = ing.productId ? products.get(ing.productId) : undefined;
-    for (const [protein, queries] of Object.entries(PROTEIN_PRODUCTS)) if (product && queries.includes(product.query)) found.add(protein);
-    const name = `${product?.query ?? ""} ${product?.name ?? ""} ${ing.kitchenItem || ing.buy ? ing.name : ""}`.toLowerCase();
+    const query = product?.query ?? catalog.find((i) => i.name === ing.item)?.query ?? undefined;
+    for (const [protein, queries] of Object.entries(PROTEIN_PRODUCTS)) if (query && queries.includes(query)) found.add(protein);
+    const name = `${query ?? ""} ${product?.name ?? ""} ${ing.item ?? ""} ${ing.kitchenItem || ing.buy ? ing.name : ""}`.toLowerCase();
     for (const [protein, re] of DANISH_PROTEINS) if (re.test(name)) found.add(protein);
   }
   return meats.some((p) => found.has(p));

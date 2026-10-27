@@ -2,12 +2,14 @@
 // life by category, "Lavet" takes the dish's ingredients out (never below 0), and
 // Sunday's text on the Køkken page can replace it all. It is never exact.
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import type { Section } from "./config.ts";
 import { getMeta, setMeta, type DB } from "./db.ts";
 import type { Unit } from "./fetch/size.ts";
+import { itemId } from "./items.ts";
 import { buyKey } from "./job/compute.ts";
+import { convert } from "./units.ts";
+
+export { convert, gramsPerPiece } from "./units.ts";
 
 export type Location = "køl" | "frost" | "skab";
 export type Category = "fisk" | "hakket" | "kød" | "grønt" | "køl" | "holdbart" | "frost";
@@ -94,7 +96,7 @@ export function isExpired(item: KitchenItem, today: string): boolean {
 export function syncPurchase(
   db: DB,
   planId: number,
-  line: { productId: string; item: string; packages: number; packageAmount: number; unit: Unit; section: Section },
+  line: { productId: string; item: string; packages: number; packageAmount: number; unit: Unit; section: Section; canonicalItem?: string },
   checked: boolean,
   day: string,
 ): void {
@@ -105,40 +107,22 @@ export function syncPurchase(
   }
   const category = categoryOf(line.item, line.section);
   db.prepare(`
-    INSERT OR IGNORE INTO kitchen (name, qty, unit, location, expires, product_id, source)
-    VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
+    INSERT OR IGNORE INTO kitchen (name, qty, unit, location, expires, product_id, source, canonical_item_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
     line.item, line.packages * line.packageAmount, line.unit, locationOf(category, line.item),
-    addDays(day, SHELF_LIFE_DAYS[category]), line.productId, source,
+    addDays(day, SHELF_LIFE_DAYS[category]), line.productId, source, line.canonicalItem ? itemId(db, line.canonicalItem) : null,
   );
-}
-
-// ---------- Units ----------
-
-let unitWeights: Record<string, number> | undefined;
-function weights(): Record<string, number> {
-  unitWeights ??= JSON.parse(readFileSync(join(import.meta.dirname, "..", "config", "units.json"), "utf8")) as Record<string, number>;
-  return unitWeights;
-}
-
-/** Grams per piece for a name, from config/units.json ("2 løg" → 150 g each). */
-export function gramsPerPiece(name: string): number | null {
-  const n = name.toLowerCase();
-  const key = Object.keys(weights()).sort((a, b) => b.length - a.length).find((k) => n.includes(k));
-  return key ? weights()[key]! : null;
-}
-
-/** Converts between units where it makes sense; null where it doesn't. ml and g count as equal. */
-export function convert(qty: number, from: Unit, to: Unit, name: string): number | null {
-  if (from === to) return qty;
-  if (from !== "stk" && to !== "stk") return qty;
-  const grams = gramsPerPiece(name);
-  if (!grams) return null;
-  return from === "stk" ? qty * grams : qty / grams;
 }
 
 // ---------- "Lavet" ----------
 
-type Usage = { qty: number; unit: Unit; name: string; productId?: string; kitchenItem?: string; basis?: boolean; buy?: boolean };
+/** lineKey: the shopping-list line the code bought an item as (plans from v2 on). */
+type Usage = { qty: number; unit: Unit; name: string; productId?: string; lineKey?: string; kitchenItem?: string; basis?: boolean; buy?: boolean };
+
+/** The shopping-list line an ingredient was bought on, which is also how its kitchen rows were ticked in. */
+function boughtAs(ing: Usage): string | undefined {
+  return ing.lineKey ?? ing.productId ?? (ing.buy ? buyKey(ing) : undefined);
+}
 
 /** Takes a dish's ingredients out of the kitchen. Returns what was actually taken, for undo. */
 export function consume(db: DB, ingredients: Usage[]): Move[] {
@@ -147,7 +131,7 @@ export function consume(db: DB, ingredients: Usage[]): Move[] {
   db.transaction(() => {
     for (const ing of ingredients) {
       // Unpriced items were ticked into the kitchen under their shopping-list key.
-      const productId = ing.productId ?? (ing.buy ? buyKey(ing) : undefined);
+      const productId = boughtAs(ing);
       const rows: Row[] = ing.kitchenItem
         ? (db.prepare("SELECT * FROM kitchen WHERE id = ? AND qty > 0").all(kitchenId(ing.kitchenItem)) as Row[])
         : productId
@@ -221,7 +205,7 @@ export function freezeAlerts(
     for (const ing of meal.ingredients) {
       const rows = ing.kitchenItem
         ? kitchen.filter((k) => k.id === kitchenId(ing.kitchenItem!))
-        : ing.productId ? kitchen.filter((k) => k.productId === ing.productId) : [];
+        : boughtAs(ing) ? kitchen.filter((k) => k.productId === boughtAs(ing)) : [];
       for (const row of rows) {
         if (row.location !== "køl" || !row.expires || row.expires < today || row.expires >= date || alerts.has(row.id)) continue;
         alerts.set(row.id, { kitchenId: row.id, name: row.name, expires: row.expires, mealTitle: meal.title, day: meal.day });
@@ -247,7 +231,8 @@ export function kitchenText(items: KitchenItem[]): string {
     .join("\n");
 }
 
-export type ConvertedItem = { id: string; name: string; qty: number; unit: Unit; location: Location; category: Category };
+/** item: the canonical item's name, when Claude recognised one. */
+export type ConvertedItem = { id: string; name: string; qty: number; unit: Unit; location: Location; category: Category; item?: string };
 
 /**
  * Replaces the kitchen with Claude's reading of the text. Items that match an
@@ -257,7 +242,7 @@ export type ConvertedItem = { id: string; name: string; qty: number; unit: Unit;
 export function replaceKitchen(db: DB, items: ConvertedItem[], today: string): Map<string, number> {
   const old = db.prepare("SELECT * FROM kitchen").all() as Row[];
   const ids = new Map<string, number>();
-  const insert = db.prepare("INSERT INTO kitchen (name, qty, unit, location, expires, product_id) VALUES (?, ?, ?, ?, ?, ?)");
+  const insert = db.prepare("INSERT INTO kitchen (name, qty, unit, location, expires, product_id, canonical_item_id) VALUES (?, ?, ?, ?, ?, ?, ?)");
   db.transaction(() => {
     db.prepare("DELETE FROM kitchen").run();
     for (const item of items) {
@@ -265,7 +250,9 @@ export function replaceKitchen(db: DB, items: ConvertedItem[], today: string): M
       // In the freezer it keeps like frozen food, whatever it is (minced meat in the freezer is not 2 days).
       const category = item.location === "frost" ? "frost" : item.category;
       const expires = match?.expires ?? addDays(today, SHELF_LIFE_DAYS[category] ?? SHELF_LIFE_DAYS.holdbart);
-      const result = insert.run(item.name, Math.max(0, item.qty), item.unit, item.location, expires, match?.product_id ?? null);
+      const result = insert.run(
+        item.name, Math.max(0, item.qty), item.unit, item.location, expires, match?.product_id ?? null, itemId(db, item.item ?? item.name),
+      );
       ids.set(item.id, Number(result.lastInsertRowid));
     }
   })();

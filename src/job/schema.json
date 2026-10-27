@@ -84,6 +84,9 @@
                     "stk"
                   ]
                 },
+                "item": {
+                  "type": "string"
+                },
                 "productId": {
                   "type": "string"
                 },
@@ -174,6 +177,9 @@
               "holdbart",
               "frost"
             ]
+          },
+          "item": {
+            "type": "string"
           }
         }
       }

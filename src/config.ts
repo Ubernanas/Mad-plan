@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { Unit } from "./fetch/size.ts";
 
 export type Household = {
   persons: number;
@@ -72,6 +73,10 @@ export function loadItems(): string[] {
  */
 export type IngredientRule = {
   words: string[];
+  /** The item's Danish name, where the search word doesn't say it well ("soyasauce" → "sojasauce"). */
+  name?: string;
+  /** The unit the item is usually counted in; g if not given. */
+  unit?: Unit;
   basis?: true;
   query?: string;
   section?: Section;

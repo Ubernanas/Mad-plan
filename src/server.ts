@@ -6,8 +6,9 @@ import { Hono } from "hono";
 import { basicAuth } from "hono/basic-auth";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadHousehold } from "./config.ts";
+import { loadHousehold, loadIngredientRules } from "./config.ts";
 import { startCron } from "./cron.ts";
+import { itemsFromRules, syncItems } from "./items.ts";
 import { effectiveHousehold, saveSettings, settingsOf } from "./settings.ts";
 import { getMeta, openDb, setMeta, type DB } from "./db.ts";
 import { DAYS, selectDishes, setDayStatus, slotOn, weekStarted, type DayStatus, type Plan } from "./job/compute.ts";
@@ -242,6 +243,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     // No .env: settings come from the environment (Fly secrets).
   }
   const db = openDb();
+  syncItems(db, itemsFromRules(loadIngredientRules()));
   resetInterruptedJob(db);
   // Only on Fly (or when asked), so a dev server on a laptop never fetches from Goma as well.
   if (process.env.FLY_APP_NAME || process.env.CRON === "on") startCron(db);

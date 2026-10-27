@@ -1,11 +1,13 @@
 // Turns Claude's dishes into the finished plan: cost per dish, the chosen dishes
-// on their days, one shopping-list line per product in whole packages, and the
-// purchase cost. Claude never does any of this arithmetic. Choosing other dishes
-// later recomputes from the plan alone (selectDishes), without Claude.
+// on their days, one shopping-list line per item (or per product a dish asked for)
+// in whole packages, and the purchase cost. Claude names items; the code picks the
+// product and does all the arithmetic. Choosing other dishes later recomputes from
+// the plan alone (selectDishes), without Claude.
 
 import { SECTIONS, type Section } from "../config.ts";
 import type { Unit } from "../fetch/size.ts";
 import type { ConvertedItem } from "../kitchen.ts";
+import { convert } from "../units.ts";
 import { mondayOf } from "../week.ts";
 
 export const DAYS = ["mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag", "søndag"];
@@ -21,13 +23,20 @@ export type Product = {
   perKg: number | null;
   /** Price taken from an earlier week because this week's page was missing. */
   estimate: boolean;
+  /** The canonical item it is ("agurk" for both cucumbers and snack cucumbers). Missing in plans from before items. */
+  item?: string;
 };
 
 export type Ingredient = {
   name: string;
   qty: number;
   unit: Unit;
+  /** The canonical item Claude named; the code picks the product unless productId is given too. */
+  item?: string;
+  /** The exact product: Claude's choice where it matters (a cut of meat), or the only source in plans from before items. */
   productId?: string;
+  /** Added by the code: the shopping-list line the item is bought on, for the kitchen and "Lavet". */
+  lineKey?: string;
   /** "k12": taken from the kitchen, so not bought. */
   kitchenItem?: string;
   basis?: boolean;
@@ -94,7 +103,12 @@ export type ShoppingItem = {
   buyBefore: string | null;
   /** The offer ends before the last day the product is used. */
   buyEarly: boolean;
+  /** The canonical item the line buys, when known. */
+  canonicalItem?: string;
 };
+
+/** Where an item without a price goes on the list, and what it is counted in. */
+export type ItemUnit = { section: Section; unit: Unit };
 
 /** What is left of a product after the planned meals: a forecast, not what is really in the kitchen. */
 export type Leftover = { productId: string; item: string; amount: number; unit: Unit; value: number };
@@ -122,6 +136,10 @@ export type PlanMeta = {
 };
 
 export type Plan = PlanMeta & {
+  /** 2 from canonical items on. Older plans have none. */
+  version?: number;
+  /** The items the dishes name, for the lines no product has a price for. */
+  items?: Record<string, ItemUnit>;
   storeReason: string;
   dietRespected: string[];
   notes: string[];
@@ -154,29 +172,38 @@ export function computePlan(
   products: Map<string, Product>,
   sections: Record<string, Section>,
   meta: PlanMeta,
+  items: Record<string, ItemUnit> = {},
 ): Plan {
   const snapshot: Record<string, PlanProduct> = {};
+  const keep = (product: Product) => (snapshot[product.id] = { ...product, section: sectionFor(product, sections) });
+  const named = new Set<string>();
   for (const dish of response.dishes) {
     for (const ingredient of dish.ingredients) {
+      if (ingredient.item && isBought(ingredient)) named.add(ingredient.item);
       if (!ingredient.productId) continue;
       const product = products.get(ingredient.productId);
       if (!product) throw new Error(`Ukendt productId ${ingredient.productId}`);
-      snapshot[product.id] = { ...product, section: sectionFor(product, sections) };
+      keep(product);
     }
   }
+  // Every product of a named item, so choosing other dishes can still pick the best one.
+  for (const product of products.values()) if (product.item && named.has(product.item)) keep(product);
 
   const options = response.dishes.map((dish, id): DishOption => {
     let mealCost = 0;
+    let unpriced = 0;
     for (const ingredient of dish.ingredients) {
-      const product = ingredient.productId ? snapshot[ingredient.productId] : undefined;
-      if (product) mealCost += (ingredient.qty / product.packageAmount) * product.price;
+      const cost = costOf(ingredient, snapshot);
+      if (cost === null) unpriced++;
+      else mealCost += cost;
     }
-    const unpriced = dish.ingredients.filter((i) => i.buy).length;
     return { ...dish, id, mealCost: kr(mealCost), pricePerPortion: kr(mealCost / dish.servings), unpriced };
   });
 
   const plan: Plan = {
     ...meta,
+    version: 2,
+    items: Object.fromEntries([...named].map((name) => [name, items[name] ?? { section: "kolonial", unit: "g" }])),
     storeReason: response.storeReason,
     dietRespected: response.dietRespected,
     notes: response.notes,
@@ -252,25 +279,40 @@ export function setDayStatus(plan: Plan, day: string, status: DayStatus): Plan {
 export function selectDishes(plan: Plan, selected: number[]): Plan {
   const ids = [...new Set(selected)].filter((id) => plan.options[id]).sort((a, b) => a - b);
   if (ids.length > DAYS.length) throw new Error(`Højst ${DAYS.length} retter kan vælges.`);
-  const meals = ids.map((id) => plan.options[id]!);
+  // Each item a chosen dish names is bought as one product, and its ingredients learn which line that is.
+  const choice = chooseProducts(plan, ids.map((id) => plan.options[id]!));
+  const options = plan.options.map((option) => !ids.includes(option.id) ? option : {
+    ...option,
+    ingredients: option.ingredients.map((ing) => ing.item && isBought(ing)
+      ? { ...ing, lineKey: ing.productId ?? choice.get(ing.item) ?? buyKey({ name: ing.item, unit: ing.unit }) }
+      : ing),
+  });
+  const meals = ids.map((id) => options[id]!);
 
-  const used = new Map<string, { amount: number; checkLabel: boolean; days: number[] }>();
-  const unknown = new Map<string, { ingredient: Ingredient; amount: number; checkLabel: boolean }>();
+  type Unpriced = { name: string; unit: Unit; section: Section | undefined; amount: number; checkLabel: boolean; item?: string };
+  const used = new Map<string, { amount: number; checkLabel: boolean; days: number[]; item?: string }>();
+  const unknown = new Map<string, Unpriced>();
   meals.forEach((meal, dayIndex) => {
     for (const ingredient of meal.ingredients) {
-      if (ingredient.buy) {
-        const entry = unknown.get(buyKey(ingredient)) ?? { ingredient, amount: 0, checkLabel: false };
+      if (!isBought(ingredient)) continue; // basis and kitchen items are not bought
+      const key = ingredient.lineKey ?? ingredient.productId ?? buyKey(ingredient);
+      const product = plan.products[key];
+      if (!product) {
+        const item = ingredient.item;
+        const entry = unknown.get(key) ?? {
+          name: item ?? ingredient.name, unit: ingredient.unit, amount: 0, checkLabel: false, item,
+          section: item ? plan.items?.[item]?.section : ingredient.section,
+        };
         entry.amount += ingredient.qty;
         entry.checkLabel ||= ingredient.checkLabel;
-        unknown.set(buyKey(ingredient), entry);
+        unknown.set(key, entry);
         continue;
       }
-      if (!ingredient.productId) continue; // basis items are not bought
-      const entry = used.get(ingredient.productId) ?? { amount: 0, checkLabel: false, days: [] };
-      entry.amount += ingredient.qty;
+      const entry = used.get(key) ?? { amount: 0, checkLabel: false, days: [], item: ingredient.item ?? product.item };
+      entry.amount += convert(ingredient.qty, ingredient.unit, product.unit, product.name) ?? ingredient.qty;
       entry.checkLabel ||= ingredient.checkLabel;
       entry.days.push(dayIndex);
-      used.set(ingredient.productId, entry);
+      used.set(key, entry);
     }
   });
 
@@ -280,7 +322,7 @@ export function selectDishes(plan: Plan, selected: number[]): Plan {
   const afterOffer = (dayIndex: number) => lastDay !== null && dateOf(dayIndex) > lastDay;
   const lateDays = new Set<number>();
 
-  const shoppingList = [...used].map(([id, { amount, checkLabel, days }]): ShoppingItem => {
+  const shoppingList = [...used].map(([id, { amount, checkLabel, days, item }]): ShoppingItem => {
     const product = plan.products[id]!;
     // The epsilon keeps 500 g of a 500 g pack from becoming two packs through float noise.
     const packages = Math.max(1, Math.ceil(amount / product.packageAmount - 1e-9));
@@ -301,19 +343,20 @@ export function selectDishes(plan: Plan, selected: number[]): Plan {
       checkLabel,
       buyBefore: onOffer ? lastDay : null,
       buyEarly,
+      ...(item ? { canonicalItem: item } : {}),
     };
   });
 
   // No product had a price: bought as needed, shown with "pris ukendt".
-  for (const [key, { ingredient, amount, checkLabel }] of unknown) {
-    const name = ingredient.name.trim();
+  for (const [key, { name: raw, unit, section, amount, checkLabel, item }] of unknown) {
+    const name = raw.trim();
     shoppingList.push({
       productId: key,
-      section: ingredient.section && SECTIONS.includes(ingredient.section) ? ingredient.section : "kolonial",
+      section: section && SECTIONS.includes(section) ? section : "kolonial",
       item: name.charAt(0).toUpperCase() + name.slice(1),
-      packageSize: formatSize(amount, ingredient.unit),
+      packageSize: formatSize(amount, unit),
       packageAmount: amount,
-      unit: ingredient.unit,
+      unit,
       usedAmount: amount,
       packages: 1,
       price: 0,
@@ -321,6 +364,7 @@ export function selectDishes(plan: Plan, selected: number[]): Plan {
       checkLabel,
       buyBefore: null,
       buyEarly: false,
+      ...(item ? { canonicalItem: item } : {}),
     });
   }
 
@@ -340,6 +384,7 @@ export function selectDishes(plan: Plan, selected: number[]): Plan {
 
   return layOut({
     ...plan,
+    options,
     selected: ids,
     shoppingList,
     totalPurchaseCost: kr(shoppingList.reduce((sum, line) => sum + line.price, 0)),
@@ -348,6 +393,72 @@ export function selectDishes(plan: Plan, selected: number[]): Plan {
     leftoverValue: kr(leftovers.reduce((sum, leftover) => sum + leftover.value, 0)),
     buyNote: buyNote(shoppingList.filter((l) => l.buyEarly), [...lateDays].sort(), lastDay),
   });
+}
+
+/** Bought in the shop: not a basis item, not from the kitchen. */
+function isBought(ingredient: Ingredient): boolean {
+  return !ingredient.basis && !ingredient.kitchenItem;
+}
+
+/** What a dish's use of an ingredient costs; null when it has no price. An item counts at its cheapest product. */
+function costOf(ingredient: Ingredient, products: Record<string, PlanProduct>): number | null {
+  if (!isBought(ingredient)) return 0;
+  if (ingredient.buy) return null;
+  const candidates = ingredient.productId
+    ? [products[ingredient.productId]].filter((p): p is PlanProduct => p !== undefined)
+    : Object.values(products).filter((p) => ingredient.item !== undefined && p.item === ingredient.item);
+  const costs = candidates.flatMap((p) => {
+    const amount = convert(ingredient.qty, ingredient.unit, p.unit, p.name);
+    return amount === null ? [] : [(amount / p.packageAmount) * p.price];
+  });
+  return costs.length ? Math.min(...costs) : null;
+}
+
+/**
+ * The product each item is bought as, for the chosen dishes. A product a dish asked for
+ * takes the other dishes' use of the item too, so it becomes one line; otherwise the
+ * product that buys the week's amount cheapest. Null when no product has a price.
+ */
+function chooseProducts(plan: Plan, meals: DishOption[]): Map<string, string | null> {
+  const asked = new Map<string, string>();
+  const loose = new Map<string, Ingredient[]>();
+  for (const meal of meals) {
+    for (const ing of meal.ingredients) {
+      if (!ing.item || ing.buy || !isBought(ing)) continue;
+      if (ing.productId) {
+        if (!asked.has(ing.item)) asked.set(ing.item, ing.productId);
+      } else {
+        loose.set(ing.item, [...(loose.get(ing.item) ?? []), ing]);
+      }
+    }
+  }
+  const choice = new Map<string, string | null>();
+  for (const [item, ings] of loose) {
+    const own = plan.products[asked.get(item) ?? ""];
+    const all = Object.values(plan.products).filter((p) => p.item === item);
+    choice.set(item, (own && cheapest([own], ings)) ?? cheapest(all, ings));
+  }
+  return choice;
+}
+
+/** The product that buys these amounts for the least money, then with the least left over. This week's prices before estimates. */
+function cheapest(products: PlanProduct[], ingredients: Ingredient[]): string | null {
+  let best: { id: string; rank: number[] } | null = null;
+  for (const p of products) {
+    const amounts = ingredients.map((i) => convert(i.qty, i.unit, p.unit, p.name));
+    if (amounts.some((a) => a === null)) continue;
+    const total = amounts.reduce((sum: number, a) => sum + a!, 0);
+    const packages = Math.max(1, Math.ceil(total / p.packageAmount - 1e-9));
+    const rank = [p.estimate ? 1 : 0, kr(packages * p.price), (packages * p.packageAmount - total) / (packages * p.packageAmount)];
+    if (!best || before(rank, best.rank)) best = { id: p.id, rank };
+  }
+  return best?.id ?? null;
+}
+
+/** Whether a sorts before b, comparing element by element. */
+function before(a: number[], b: number[]): boolean {
+  const i = a.findIndex((v, j) => v !== b[j]);
+  return i !== -1 && a[i]! < b[i]!;
 }
 
 /**

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { openDb, type DB } from "./db.ts";
+import { itemId, itemsFromRules, syncItems } from "./items.ts";
 import {
   addDays, categoryOf, consume, convert, freeze, freezeAlerts, isExpired, kitchenText, listKitchen, locationOf, replaceKitchen, restore, syncPurchase, unfreeze,
 } from "./kitchen.ts";
@@ -142,4 +143,14 @@ test("anything in the freezer keeps like frozen food, even if Claude calls it mi
   const db = openDb(":memory:");
   replaceKitchen(db, [{ id: "k1", name: "Hakket oksekød", qty: 300, unit: "g", location: "frost", category: "hakket" }], "2026-10-24");
   assert.equal(listKitchen(db)[0]!.expires, addDays("2026-10-24", 90));
+});
+
+test("a ticked line knows its item, and 'Lavet' finds an item ingredient by the line it was bought on", () => {
+  const db = openDb(":memory:");
+  syncItems(db, itemsFromRules([{ words: ["cucumber"], query: "agurk", section: "frugt og grønt", unit: "stk" }]));
+  syncPurchase(db, 1, { ...line("10", "Agurk", "frugt og grønt", 1, "stk", 3), canonicalItem: "agurk" }, true, "2026-10-26");
+  const row = db.prepare("SELECT canonical_item_id AS id FROM kitchen").get() as { id: number };
+  assert.equal(row.id, itemId(db, "agurk"));
+  consume(db, [{ name: "snackagurker", lineKey: "10", qty: 1, unit: "stk" }]);
+  assert.equal(listKitchen(db)[0]!.qty, 2);
 });

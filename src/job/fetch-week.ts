@@ -7,6 +7,7 @@ import { getMeta, setMeta, type DB } from "../db.ts";
 import { fetchSearch, type GomaProduct } from "../fetch/goma.ts";
 import type { HttpClient } from "../fetch/http.ts";
 import { fetchLeaflet, type LeafletInfo } from "../fetch/validity.ts";
+import { itemFor, itemId, itemsFromRules, syncItems, type CanonicalItem } from "../items.ts";
 import type { Recipe } from "../recipes.ts";
 import { mondayOf, planWeek, weekKey } from "../week.ts";
 import { getKitchenDraft, isExpired, listKitchen, todayIso } from "../kitchen.ts";
@@ -107,7 +108,9 @@ export async function fetchWeek({
 
   // Words not fetched this week are priced from earlier weeks, like a failed search.
   const estimated = [...missing, ...empty, ...unfetched];
-  const saved = save(db, week, choice, found, estimated, now().toISOString());
+  const catalog = itemsFromRules(rules);
+  syncItems(db, catalog);
+  const saved = save(db, week, choice, found, estimated, catalog, now().toISOString());
 
   // Only dates for "køb senest". Without them the plan is still made, just without the notes.
   let leaflet: LeafletInfo | null = null;
@@ -175,12 +178,17 @@ function save(
   choice: StoreChoice,
   found: { query: string; product: GomaProduct }[],
   missing: string[],
+  items: CanonicalItem[],
   fetchedAt: string,
 ): number {
   const insert = db.prepare(`
     INSERT OR IGNORE INTO products
-      (week, store, goma_id, query, name, package_amount, unit, price, normal_price, per_kg, on_offer, fetched_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      (week, store, goma_id, query, name, package_amount, unit, price, normal_price, per_kg, on_offer, fetched_at, canonical_item_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  const itemIdOf = (query: string, name: string) => {
+    const item = itemFor(query, name, items);
+    return item ? itemId(db, item.name) : null;
+  };
 
   return db.transaction(() => {
     db.prepare("DELETE FROM products WHERE week = ?").run(week);
@@ -190,7 +198,7 @@ function save(
       if (p.store !== choice.store) continue;
       saved += insert.run(
         week, choice.store, p.gomaId, query, p.name, p.packageAmount, p.unit,
-        p.price, p.normalPrice, p.perKg, p.onOffer ? 1 : 0, fetchedAt,
+        p.price, p.normalPrice, p.perKg, p.onOffer ? 1 : 0, fetchedAt, itemIdOf(query, p.name),
       ).changes;
     }
     db.prepare(`

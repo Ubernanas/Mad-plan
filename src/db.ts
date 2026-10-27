@@ -76,6 +76,26 @@ CREATE TABLE IF NOT EXISTS kitchen (
   location TEXT NOT NULL CHECK (location IN ('køl', 'frost', 'skab')),
   expires  TEXT
 );
+
+-- What a recipe asks for ('agurk', 'laktosefri fløde'), whatever product it is bought as.
+-- Built from config/ingredients.json at startup; Claude's names for new things are added too.
+CREATE TABLE IF NOT EXISTS canonical_item (
+  id          INTEGER PRIMARY KEY,
+  name_da     TEXT NOT NULL UNIQUE,
+  section     TEXT NOT NULL,
+  base_unit   TEXT NOT NULL CHECK (base_unit IN ('g', 'ml', 'stk')),
+  is_staple   INTEGER NOT NULL DEFAULT 0,  -- oil, salt, spices: never bought
+  goma_query  TEXT,                        -- the search word it is fetched with
+  name_filter TEXT                         -- e.g. 'laktosefri', when the variant shares its page with the plain item
+);
+
+-- Other names for an item: the recipes' English words, and Claude's own names.
+CREATE TABLE IF NOT EXISTS item_alias (
+  alias             TEXT PRIMARY KEY,
+  canonical_item_id INTEGER NOT NULL REFERENCES canonical_item (id),
+  source            TEXT NOT NULL,         -- 'rule' | 'claude' | 'user'
+  confirmed         INTEGER NOT NULL DEFAULT 0
+);
 `;
 
 /** Columns added after a table was first created. Added if missing, so old databases catch up. */
@@ -84,6 +104,9 @@ const ADDED_COLUMNS: [table: string, column: string, definition: string][] = [
   ["kitchen", "product_id", "TEXT"],
   // "plan:<id>:<product>" for rows from a tick, so unticking removes exactly that row.
   ["kitchen", "source", "TEXT"],
+  // The canonical item a product or kitchen row is, so the plan finds it by item, not by one product.
+  ["products", "canonical_item_id", "INTEGER"],
+  ["kitchen", "canonical_item_id", "INTEGER"],
 ];
 
 function migrate(db: DB): void {

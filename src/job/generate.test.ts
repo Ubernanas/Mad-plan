@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Household, Section } from "../config.ts";
+import { loadIngredientRules, type Household, type Section } from "../config.ts";
 import { openDb, setMeta, type DB } from "../db.ts";
+import { itemsFromRules, syncItems } from "../items.ts";
 import { listKitchen, replaceKitchen } from "../kitchen.ts";
 import type { Recipe } from "../recipes.ts";
 import type { ClaudeResponse } from "./compute.ts";
-import { buildPrompt, generatePlan, jobEnv, loadProducts, parseClaudeOutput, PlanError, validateResponse, type RunClaude } from "./generate.ts";
+import {
+  buildPrompt, generatePlan, jobEnv, loadProducts, parseClaudeOutput, PlanError, validateResponse, weekItems, type RunClaude,
+} from "./generate.ts";
 
 const FRIDAY = () => new Date("2026-10-23T12:00:00Z"); // plan week 2026-W43
 const SECTIONS: Record<string, Section> = { ris: "kolonial", kylling: "kød og fisk" };
@@ -67,8 +70,12 @@ test("a valid answer is computed and saved as the week's plan", async () => {
   assert.deepEqual(saved, [{ week: "2026-W43", store: "Netto" }]);
 
   const input = JSON.parse(run.inputs[0]!);
-  assert.equal(input.products.length, 3);
-  assert.deepEqual(Object.keys(input.products[0]).sort(), ["id", "name", "onOffer", "packageAmount", "perKg", "price", "unit"]);
+  assert.equal(input.products, undefined);
+  const rice = input.items.find((i: { item: string }) => i.item === "ris");
+  assert.deepEqual([rice.unit, rice.section, rice.products.map((p: { id: string }) => p.id)], ["g", "kolonial", ["1"]]);
+  assert.deepEqual(Object.keys(rice.products[0]).sort(), ["id", "name", "onOffer", "packageAmount", "perKg", "price", "unit"]);
+  // No price this week, but Claude may still name it.
+  assert.ok(input.items.some((i: { item: string; products: unknown[] }) => i.item === "laktosefri fløde" && i.products.length === 0));
   assert.equal(input.preferences, "Vi kan lide kylling.");
   assert.equal(input.household.dishOptions, 3);
   assert.equal(plan.options.length, 3);
@@ -206,6 +213,88 @@ test("an ingredient without a product is bought anyway, on the list as \"pris uk
   assert.equal(plan.totalPurchaseCost, 20 + 40 + 10);
   assert.equal(plan.options[1]!.unpriced, 1);
   assert.equal(plan.leftovers.some((l) => l.item === "Lime"), false);
+});
+
+/** good(), with two kinds of cucumber, a leek without a price, and an item answer. */
+function withCucumbers(db: DB) {
+  const insert = db.prepare(`INSERT INTO products (week, store, goma_id, query, name, package_amount, unit, price, normal_price, per_kg, on_offer, fetched_at)
+    VALUES ('2026-W43', 'Netto', ?, 'agurk', ?, ?, ?, ?, NULL, NULL, 0, 'x')`);
+  insert.run("10", "Agurk", 1, "stk", 8);
+  insert.run("11", "Snackagurker", 250, "g", 15);
+  const answer = good();
+  for (const dish of answer.dishes) dish.ingredients.push({ name: "agurk", item: "agurk", qty: 1, unit: "stk", checkLabel: false });
+  answer.dishes[2]!.ingredients.push({ name: "snackagurker", item: "Agurk", qty: 100, unit: "g", checkLabel: false });
+  answer.dishes[1]!.ingredients.push({ name: "porre", item: "porrer", qty: 1, unit: "stk", checkLabel: false });
+  return answer;
+}
+
+test("one line per item across dishes, and the code picks the product that buys it cheapest", async () => {
+  const db = openDb(":memory:");
+  seed(db);
+  const { plan } = await generatePlan(options(db, claudeSays(withCucumbers(db))));
+
+  assert.equal(plan.version, 2);
+  const cucumbers = plan.shoppingList.filter((l) => l.canonicalItem === "agurk");
+  // 2 stk + 100 g (about 0,3 stk): 3 whole cucumbers for 24 kr beat 4 bags of snack cucumbers (800 g) for 60 kr.
+  assert.deepEqual(cucumbers.map((l) => [l.productId, l.packages, l.price]), [["10", 3, 24]]);
+  const leek = plan.shoppingList.find((l) => l.canonicalItem === "porrer")!;
+  assert.deepEqual([leek.item, leek.priceSource, leek.section], ["Porrer", "unknown", "frugt og grønt"]);
+  assert.equal(plan.options[1]!.unpriced, 1);
+  // Each ingredient knows the line it is bought on, so "Lavet" finds it in the kitchen.
+  const tirsdag = plan.meals.find((m) => m.day === "tirsdag")!;
+  assert.deepEqual(tirsdag.ingredients.filter((i) => i.item === "agurk").map((i) => i.lineKey), ["10", "10"]);
+});
+
+test("a product a dish asks for takes the other dishes' use of the item too", async () => {
+  const db = openDb(":memory:");
+  seed(db);
+  const answer = withCucumbers(db);
+  answer.dishes[2]!.ingredients.at(-1)!.productId = "11"; // the snack cucumbers
+  const { plan } = await generatePlan(options(db, claudeSays(answer)));
+  // 1 stk (350 g) + 1 stk + 100 g = 800 g of snack cucumbers: 4 bags, one line.
+  assert.deepEqual(plan.shoppingList.filter((l) => l.canonicalItem === "agurk").map((l) => [l.productId, l.packages]), [["11", 4]]);
+});
+
+test("items are checked: known names only, meat and fish name their product, units that convert", () => {
+  const db = openDb(":memory:");
+  seed(db);
+  const catalog = itemsFromRules(loadIngredientRules());
+  syncItems(db, catalog);
+  const products = loadProducts(db, "2026-W43", "Netto", [], catalog);
+  const items = weekItems(db, products, SECTIONS);
+  const r = good();
+  r.dishes[0]!.ingredients[0] = { name: "kylling", item: "kylling", qty: 250, unit: "g", checkLabel: false };
+  r.dishes[1]!.ingredients[1] = { name: "ris", item: "ris", qty: 2, unit: "stk", checkLabel: false };
+  r.dishes[2]!.ingredients[2] = { name: "rosenkål", item: "rosenkål", qty: 200, unit: "g", checkLabel: false };
+  r.dishes[2]!.ingredients[1] = { name: "ris", item: "gulerødder", productId: "1", qty: 150, unit: "g", checkLabel: false };
+  const errors = validateResponse(r, products, household, { items: [] }, new Map(), items);
+  assert.ok(errors.some((e) => e.includes("kød og fisk skal have productId")));
+  assert.ok(errors.some((e) => e.includes("enheden skal være g som varens produkter")));
+  assert.ok(errors.some((e) => e.includes(`item "rosenkål" findes ikke`)));
+  assert.ok(errors.some((e) => e.includes("hører til ris, ikke gulerødder")));
+  assert.equal(errors.length, 4);
+});
+
+test("an item on a basis ingredient is dropped, not a reason to reject the answer", async () => {
+  const db = openDb(":memory:");
+  seed(db);
+  const answer = good();
+  for (const dish of answer.dishes) dish.ingredients[3]!.item = "salt";
+  const run = claudeSays(answer);
+  const { plan } = await generatePlan(options(db, run));
+  assert.equal(run.prompts.length, 1);
+  assert.equal(plan.options[0]!.ingredients[3]!.item, undefined);
+});
+
+test("what Claude buys outside the items becomes an unconfirmed item for next time", async () => {
+  const db = openDb(":memory:");
+  seed(db);
+  const answer = good();
+  answer.dishes[1]!.ingredients.push({ name: "Tahin", qty: 30, unit: "g", buy: true, section: "kolonial", checkLabel: false });
+  await generatePlan(options(db, claudeSays(answer)));
+  assert.deepEqual(db.prepare("SELECT a.alias, a.source, a.confirmed, c.section FROM item_alias a JOIN canonical_item c ON c.id = a.canonical_item_id WHERE a.alias = 'tahin'").get(),
+    { alias: "tahin", source: "claude", confirmed: 0, section: "kolonial" });
+  assert.ok(weekItems(db, new Map(), SECTIONS).has("tahin"));
 });
 
 function seededDb() {
