@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { openDb } from "../db.ts";
-import { createHttpClient, userAgent } from "./http.ts";
+import { createHttpClient, pruneCache, userAgent } from "./http.ts";
 import { parseRobots } from "./robots.ts";
 import { planWeek, weekKey } from "../week.ts";
 
@@ -166,4 +166,13 @@ test("planWeek: Sunday belongs to the coming week", () => {
   assert.equal(planWeek(new Date("2026-10-24T12:00:00Z")), "2026-W43"); // Saturday
   assert.equal(planWeek(new Date("2026-10-25T13:00:00Z")), "2026-W44"); // Sunday 14:00
   assert.equal(planWeek(new Date("2026-10-26T12:00:00Z")), "2026-W44"); // Monday
+});
+
+test("pages older than 4 weeks are deleted; the last 4 weeks stay", () => {
+  const db = openDb(":memory:");
+  const insert = db.prepare("INSERT INTO page_cache (url, week, status, body, fetched_at) VALUES ('u', ?, 200, '', 'x')");
+  for (const week of ["2026-W39", "2026-W40", "2026-W41", "2026-W44", "2026-W45"]) insert.run(week);
+  // Thursday of week 45: weeks 41 to 45 are kept.
+  assert.equal(pruneCache(db, new Date("2026-11-05T12:00:00Z")), 2);
+  assert.deepEqual(db.prepare("SELECT week FROM page_cache ORDER BY week").all().map((r) => (r as { week: string }).week), ["2026-W41", "2026-W44", "2026-W45"]);
 });

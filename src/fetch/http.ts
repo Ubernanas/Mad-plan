@@ -4,7 +4,7 @@
 
 import { createHash } from "node:crypto";
 import { getMeta, setMeta, type DB } from "../db.ts";
-import { planWeek } from "../week.ts";
+import { mondayOf, planWeek, weekKey } from "../week.ts";
 import { allowAll, disallowAll, parseRobots, type Robots } from "./robots.ts";
 
 const TOKEN = "madplan-personlig";
@@ -32,6 +32,15 @@ export function userAgent(contactEmail: string): string {
   return `${TOKEN}/1.0 (+kontakt: ${contactEmail})`;
 }
 
+/** Weeks of cached pages kept. The cache only saves requests within its own week; the rest are kept a while to look into. */
+const CACHE_WEEKS = 4;
+
+/** Deletes cached pages older than CACHE_WEEKS weeks, so the database doesn't grow by every week's pages. */
+export function pruneCache(db: DB, now: Date = new Date()): number {
+  const oldest = weekKey(new Date(mondayOf(planWeek(now)).getTime() - CACHE_WEEKS * 7 * 86_400_000));
+  return db.prepare("DELETE FROM page_cache WHERE week < ?").run(oldest).changes;
+}
+
 export function createHttpClient(options: HttpOptions): HttpClient {
   const {
     db,
@@ -44,6 +53,9 @@ export function createHttpClient(options: HttpOptions): HttpClient {
     now = () => new Date(),
     log = (message) => console.log(`[http] ${message}`),
   } = options;
+
+  const pruned = pruneCache(db, now());
+  if (pruned) log(`${pruned} gemte sider ældre end ${CACHE_WEEKS} uger er slettet.`);
 
   const blockedHosts = new Set<string>();
   const robotsByHost = new Map<string, Robots>();
