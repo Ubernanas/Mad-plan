@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { loadIngredientRules, type Household } from "../config.ts";
-import { openDb } from "../db.ts";
+import { openDb, type DB } from "../db.ts";
 import type { HttpClient } from "../fetch/http.ts";
 import type { Recipe } from "../recipes.ts";
-import { fetchWeek } from "./fetch-week.ts";
+import { fetchWeek, unmadeDishes } from "./fetch-week.ts";
 import { SourceBlockedError, SourceChangedError } from "./store.ts";
 
 const FRIDAY = () => new Date("2026-10-23T12:00:00Z");
@@ -142,6 +142,70 @@ test("recipes decide the extra search words; words Goma lacks are estimates and 
   const nextWeek = await run(() => new Date("2026-10-30T12:00:00Z"), [...recipes, unpriced]);
   assert.deepEqual(Object.keys(nextWeek.counts), ["kylling", "ris", "hakkede-tomater"]);
   assert.deepEqual(nextWeek.candidates.map((r) => r.id).sort(), [1, 2, 3]);
+});
+
+function savePlan(db: DB, week: string, plan: unknown) {
+  db.prepare("INSERT INTO plans (week, store, plan_json, created_at) VALUES (?, 'Netto', ?, 'x')").run(week, JSON.stringify(plan));
+}
+
+const LAST_WEEK = {
+  options: [
+    { title: "Lavet", recipeId: 1 },
+    { title: "Sprunget over", recipeId: 2, sideRecipeId: 5 },
+    { title: "For meget gluten nu", recipeId: 3 },
+    { title: "Claudes egen" },
+    { title: "Ikke valgt", recipeId: 4 },
+  ],
+  selected: [0, 1, 2, 3],
+  done: [0],
+};
+
+test("the dishes last week's plan didn't get to are the unmade ones, made or unchosen ones are not", () => {
+  const db = openDb(":memory:");
+  savePlan(db, "2026-W42", LAST_WEEK);
+  assert.deepEqual(unmadeDishes(db, "2026-W43"), [
+    { title: "Sprunget over", recipeId: 2, sideRecipeId: 5 },
+    { title: "For meget gluten nu", recipeId: 3, sideRecipeId: undefined },
+  ]);
+});
+
+test("only the week's newest plan before this one counts, and only within 4 weeks", () => {
+  const plan = (recipeId: number) => ({ options: [{ title: "Ret", recipeId }], selected: [0], done: [] });
+  const recipeOf = (db: DB, week: string) => unmadeDishes(db, week).map((d) => d.recipeId);
+
+  const db = openDb(":memory:");
+  savePlan(db, "2026-W41", plan(1));
+  savePlan(db, "2026-W42", plan(2));
+  savePlan(db, "2026-W42", plan(3));
+  savePlan(db, "2026-W43", plan(4));
+  assert.deepEqual(recipeOf(db, "2026-W43"), [3]); // a rerun of this week's plan sees the same dishes
+  assert.deepEqual(recipeOf(db, "2026-W47"), [4]);
+  assert.deepEqual(recipeOf(db, "2026-W48"), []);
+});
+
+test("a plan from before dishes could be chosen has no unmade dishes", () => {
+  const db = openDb(":memory:");
+  savePlan(db, "2026-W42", { meals: [{ title: "Gammel" }] });
+  assert.deepEqual(unmadeDishes(db, "2026-W43"), []);
+});
+
+test("unmade dishes come back first, despite the 4-week rule and a poor rating, if the diet still allows", async () => {
+  const db = openDb(":memory:");
+  savePlan(db, "2026-W42", LAST_WEEK);
+  const recipe = (id: number, extra: Partial<Recipe> = {}): Recipe => ({
+    id, kind: "main", name: `Ret ${id}`, category: "Chicken", minutes: 30, servings: 4, rating: 5, reviews: 100,
+    ingredients: ["chicken", "rice"], amounts: ["1", "1"], steps: ["Cook.", "Serve."], proteins: ["chicken"], gluten: [], dairy: [], ...extra,
+  });
+  const recipes = [
+    recipe(1), recipe(2, { rating: 4.5, reviews: 10 }), recipe(3, { gluten: ["a", "b", "c"] }), recipe(4), recipe(6),
+    recipe(5, { kind: "side", proteins: [], rating: 4.5, reviews: 10 }), recipe(7, { kind: "side", proteins: [] }),
+  ];
+  const logs: string[] = [];
+  const summary = await fetchWeek({
+    db, http: fakeHttp(NETTO_PAGES), household, items: ["kylling", "ris"], recipes, rules: loadIngredientRules(), now: FRIDAY, log: (m) => void logs.push(m),
+  });
+  assert.deepEqual(summary.candidates.map((r) => r.id), [2, 5, 6, 7]);
+  assert.ok(logs.includes("Fra sidste plan, ikke lavet: Ret 2, Ret 5."));
 });
 
 test("a diet variant Goma has no page for falls back to the plain word in the same run", async () => {

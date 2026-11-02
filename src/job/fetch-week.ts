@@ -11,7 +11,7 @@ import { itemFor, itemId, itemsFromRules, syncItems, type CanonicalItem } from "
 import type { Recipe } from "../recipes.ts";
 import { mondayOf, planWeek, weekKey } from "../week.ts";
 import { getKitchenDraft, isExpired, listKitchen, todayIso } from "../kitchen.ts";
-import { chooseQueries, kitchenStock, offerWeights, selectMains, selectSides, type KitchenStock } from "./candidates.ts";
+import { chooseQueries, kitchenStock, offerWeights, selectMains, selectSides, suitsDiet, type KitchenStock } from "./candidates.ts";
 import { chooseStore, SourceBlockedError, SourceChangedError, type StoreChoice } from "./store.ts";
 
 /** Goma pages per run, robots.txt and the store choice included (CLAUDE.md: about 25). */
@@ -85,10 +85,16 @@ export async function fetchWeek({
   const diet = household.diet;
   const buying = { diet, substitutes: household.substitutes };
   const kitchen = { stock: stockOf(db, rules, now()), rules, buying };
-  const options = { diet, recent: recentRecipes(db, week), seed: week, kitchen };
+  // Dishes last week's plan didn't get to come back first, whatever their rating.
+  const unmade = new Set(unmadeDishes(db, week).flatMap((d) => [d.recipeId, d.sideRecipeId]));
+  const back = recipes.filter((r) => unmade.has(r.id) && suitsDiet(r, diet));
+  if (back.length) log(`Fra sidste plan, ikke lavet: ${back.map((r) => r.name).join(", ")}.`);
+  const options = { diet, recent: new Set([...recentRecipes(db, week), ...back.map((r) => r.id)]), seed: week, kitchen };
+  const countOf = (kind: Recipe["kind"]) => back.filter((r) => r.kind === kind).length;
   const candidates = [
-    ...selectMains(recipes, offerWeights(found, choice.store), { ...options, count: MAINS }),
-    ...selectSides(recipes, { ...options, count: SIDES }),
+    ...back,
+    ...selectMains(recipes, offerWeights(found, choice.store), { ...options, count: MAINS - countOf("main") }),
+    ...selectSides(recipes, { ...options, count: SIDES - countOf("side") }),
   ];
   const failed = failedQueries(db, week);
   const { queries, unfetched } = chooseQueries(candidates, rules, {
@@ -161,6 +167,28 @@ function stockOf(db: DB, rules: IngredientRule[], now: Date): KitchenStock {
     query: item.productId && !item.productId.startsWith("buy:") ? ((queryOf.get(item.productId) as { query: string } | undefined)?.query ?? null) : null,
   }));
   return kitchenStock(items, "", known, today);
+}
+
+/** A dish chosen in the last plan but never marked "Lavet". Dishes Claude wrote itself have no recipe to bring back. */
+export type UnmadeDish = { title: string; recipeId: number; sideRecipeId?: number | undefined };
+
+/** The unmade dishes of the newest plan before this week, in the order they were to be cooked. */
+export function unmadeDishes(db: DB, week: string): UnmadeDish[] {
+  const row = db.prepare("SELECT plan_json FROM plans WHERE week < ? AND week >= ? ORDER BY week DESC, id DESC LIMIT 1")
+    .get(week, weeksBefore(week, 4)) as { plan_json: string } | undefined;
+  if (!row) return [];
+  // Plans from before dishes could be chosen have no selected.
+  const plan = JSON.parse(row.plan_json) as {
+    options?: { title: string; recipeId?: number; sideRecipeId?: number }[];
+    selected?: number[];
+    done?: number[];
+  };
+  const done = new Set(plan.done ?? []);
+  return (plan.selected ?? []).flatMap((id) => {
+    const dish = plan.options?.[id];
+    if (dish?.recipeId === undefined || done.has(id)) return [];
+    return [{ title: dish.title, recipeId: dish.recipeId, sideRecipeId: dish.sideRecipeId }];
+  });
 }
 
 /** Recipes used in the plans of the last 4 weeks, so they don't come back too soon. */

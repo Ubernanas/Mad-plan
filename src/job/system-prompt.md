@@ -12,6 +12,7 @@ På stdin får du JSON med:
 - `household`: antal personer, antal aftensmåltider, antal retter at vælge imellem, budget, kosthensyn og `substitutes`: husstandens faste erstatninger, fx `{ "fløde": "kokosmælk" }`.
 - `preferences`: husstandens egne ord om, hvad de kan lide, og hvor lang tid maden må tage.
 - `wishes`: husstandens ønsker til netop denne uge. Kan være tom.
+- `unmade`: retter fra sidste plan, som husstanden ikke nåede at lave, med `title`, `recipeId` og evt. `sideRecipeId`. Kan være tom.
 - Enten `kitchen`: det, husstanden har i køkkenet, med `id`, `name`, `qty`, `unit`, `location` og `expires` (sidste gode dag). Eller `kitchenText`: husstandens egne ord om, hvad de har i køkkenet.
 - `storeChoice`: hvilken butik der er valgt, og besparelsen på proteintilbud pr. butik.
 
@@ -65,6 +66,7 @@ Desuden:
 # Ugen
 
 - Foreslå præcis `household.dishOptions` forskellige retter, og markér `household.dinnersPerWeek` af dem med `suggested: true`: den uge, du selv anbefaler. Resten er alternativer med andre proteiner og køkkener.
+- Retterne i `unmade` kommer før alt andet: tag dem med i ugen med `suggested: true` og samme `recipeId` og `sideRecipeId`, også selv om det går ud over variationen. Er de flere end `household.dinnersPerWeek`, så vælg dem, der bruger mest fra køkkenet. Læg dem så tidligt i ugen, som reglen om rækkefølge nedenfor tillader.
 - Variér ugen: forskellige proteiner, køkkener og tilberedninger. Ikke den samme slags ret flere gange.
 - Følg `wishes` og `preferences`, hvor det kan lade sig gøre. Kan et ønske ikke opfyldes, så skriv det i `notes`.
 - Brug gerne varer på tilbud, og sigt efter budgettet, men vælg aldrig en dårligere ret for at spare. Budgettet er et mål, ikke en grænse.

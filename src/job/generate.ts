@@ -17,6 +17,7 @@ import { convert } from "../units.ts";
 import { mondayOf, planWeek } from "../week.ts";
 import { PROTEIN_PRODUCTS } from "./candidates.ts";
 import { computePlan, type ClaudeResponse, type Dish, type ItemUnit, type Plan, type Product } from "./compute.ts";
+import { unmadeDishes } from "./fetch-week.ts";
 
 export const BASIS_ITEMS = ["olie", "salt", "peber", "tørre krydderier", "eddike", "sukker", "vand"];
 const JOB_FILES = import.meta.dirname;
@@ -59,6 +60,10 @@ export async function generatePlan({
   const items = weekItems(db, products, sections);
   const candidates = loadCandidates(db, week, recipes);
   const today = todayIso(now());
+  // Only those that are among the week's recipes can be used; the diet may have ruled some out.
+  const unmade = unmadeDishes(db, week).filter((d) => candidates.has(d.recipeId)).map((d) => ({
+    ...d, sideRecipeId: d.sideRecipeId !== undefined && candidates.has(d.sideRecipeId) ? d.sideRecipeId : undefined,
+  }));
   // Either the kitchen as it stands (expired fresh items left out), or the household's own words about it.
   const kitchen: KitchenSource = kitchenText.trim()
     ? { text: kitchenText.trim() }
@@ -75,6 +80,7 @@ export async function generatePlan({
     },
     preferences,
     wishes,
+    unmade,
     basisItems: BASIS_ITEMS,
     ...("text" in kitchen
       ? { kitchenText: kitchen.text }
@@ -101,6 +107,9 @@ export async function generatePlan({
     if (errors.length === 0 && "response" in parsed) {
       const response = parsed.response as ClaudeResponse;
       normaliseItems(response, products);
+      for (const { title, recipeId } of unmade) {
+        if (!response.dishes.some((d) => d.suggested && d.recipeId === recipeId)) log(`${title} fra sidste plan kom ikke med i ugens valg.`);
+      }
       for (const dish of response.dishes) {
         const main = dish.recipeId === undefined ? undefined : candidates.get(dish.recipeId);
         const side = dish.sideRecipeId === undefined ? undefined : candidates.get(dish.sideRecipeId);

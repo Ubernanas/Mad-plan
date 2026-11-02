@@ -113,6 +113,30 @@ test("the week's mains and sides are sent to Claude, and a dinner credits both",
   assert.equal(plan.options[0]!.sources, undefined); // written by Claude itself
 });
 
+test("unmade dishes among the week's recipes are sent to Claude, and one left out of the week is logged", async () => {
+  const db = openDb(":memory:");
+  seed(db);
+  setMeta(db, "candidates:2026-W43", "[1]");
+  db.prepare("INSERT INTO plans (week, store, plan_json, created_at) VALUES ('2026-W42', 'Netto', ?, 'x')").run(JSON.stringify({
+    options: [{ title: "Bourbon", recipeId: 1, sideRecipeId: 2 }, { title: "Ude af ugens opskrifter", recipeId: 9 }],
+    selected: [0, 1],
+    done: [],
+  }));
+
+  const logs: string[] = [];
+  const run = claudeSays(good());
+  await generatePlan({ ...options(db, run), recipes: [bourbon, lemonPotatoes], log: (m) => void logs.push(m) });
+  // The side isn't among the week's recipes, so Claude can't be told to use it.
+  assert.deepEqual(JSON.parse(run.inputs[0]!).unmade, [{ title: "Bourbon", recipeId: 1 }]);
+  assert.ok(logs.includes("Bourbon fra sidste plan kom ikke med i ugens valg."));
+
+  const answer = good();
+  answer.dishes[1]!.recipeId = 1;
+  logs.length = 0;
+  await generatePlan({ ...options(db, claudeSays(answer)), recipes: [bourbon, lemonPotatoes], log: (m) => void logs.push(m) });
+  assert.ok(!logs.some((l) => l.includes("kom ikke med")));
+});
+
 test("a week without candidates sends no recipes and does not ask for them", async () => {
   const db = openDb(":memory:");
   seed(db);

@@ -138,11 +138,14 @@ type CandidateOptions = {
   kitchen?: { stock: KitchenStock; rules: IngredientRule[]; buying: Buying };
 };
 
+/** Many swaps (gluten-free pasta, lactose-free cream …) and the dish is no longer the one people rated. */
+export function suitsDiet(r: Recipe, diet: Diet): boolean {
+  return (!diet.glutenFree || r.gluten.length <= 2) && (!diet.lactoseFree || r.dairy.length <= 3);
+}
+
 /** Recipes the household can eat, ranked by what people thought of them, with a new mix every week. */
 function ranked(recipes: Recipe[], { diet, recent, seed, kitchen }: CandidateOptions): Recipe[] {
-  // Many swaps (gluten-free pasta, lactose-free cream …) and the dish is no longer the one people rated.
-  const eligible = recipes.filter((r) =>
-    !recent.has(r.id) && (!diet.glutenFree || r.gluten.length <= 2) && (!diet.lactoseFree || r.dairy.length <= 3));
+  const eligible = recipes.filter((r) => !recent.has(r.id) && suitsDiet(r, diet));
   const swaps = (r: Recipe) => (diet.glutenFree ? r.gluten.length : 0) + (diet.lactoseFree ? r.dairy.length : 0);
   // A preference, not a rule: at most about as much as a good rating gives.
   const fromKitchen = (r: Recipe) => {
