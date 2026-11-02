@@ -4,7 +4,7 @@ import { test } from "node:test";
 import type { Household } from "../config.ts";
 import { parseGomaPage, type GomaProduct } from "../fetch/goma.ts";
 import type { HttpClient } from "../fetch/http.ts";
-import { bestStore, chooseStore, SourceChangedError, storeSavings } from "./store.ts";
+import { bestStore, chooseStore, SourceBlockedError, SourceChangedError, storeSavings } from "./store.ts";
 
 const STORES = ["Netto", "Føtex", "Bilka", "Lidl", "REMA 1000", "365discount"];
 
@@ -38,7 +38,7 @@ function fakeHttp(pages: Record<string, string | null>): HttpClient & { urls: st
       urls.push(url);
       return url in pages ? pages[url]! : "<html></html>";
     },
-    isBlocked: () => false,
+    blockReason: () => null,
     pagesFetched: () => urls.length,
   };
 }
@@ -103,6 +103,16 @@ test("a protein page that could not be fetched is skipped, not fatal", async () 
   });
   const choice = await chooseStore(http, household(), () => {});
   assert.ok(STORES.includes(choice.store));
+});
+
+test("a block stops the store choice at once and says what Goma answered", async () => {
+  const http = { ...fakeHttp({ "https://goma.gg/tilbud/kylling": null }), blockReason: () => "HTTP 403" };
+  await assert.rejects(chooseStore(http, household()), (error: Error) => {
+    assert.ok(error instanceof SourceBlockedError);
+    assert.equal(error.message, "Goma afviser hentningen: HTTP 403.");
+    return true;
+  });
+  assert.equal(http.urls.length, 1);
 });
 
 test("fixed mode uses fixedStore and fetches nothing", async () => {

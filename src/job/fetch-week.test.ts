@@ -6,7 +6,7 @@ import { openDb } from "../db.ts";
 import type { HttpClient } from "../fetch/http.ts";
 import type { Recipe } from "../recipes.ts";
 import { fetchWeek } from "./fetch-week.ts";
-import { SourceChangedError } from "./store.ts";
+import { SourceBlockedError, SourceChangedError } from "./store.ts";
 
 const FRIDAY = () => new Date("2026-10-23T12:00:00Z");
 
@@ -21,7 +21,7 @@ function fakeHttp(pages: Record<string, string>): HttpClient {
       count++;
       return pages[url] ?? "<html></html>";
     },
-    isBlocked: () => false,
+    blockReason: () => null,
     pagesFetched: () => count,
   };
 }
@@ -101,6 +101,16 @@ test("stops before saving when more than half of the item list is empty", async 
     SourceChangedError,
   );
   assert.equal((db.prepare("SELECT COUNT(*) AS n FROM products").get() as { n: number }).n, 0);
+  assert.equal(db.prepare("SELECT 1 FROM fetches").get(), undefined);
+});
+
+test("a block on the item list is reported as a block, not as a changed source", async () => {
+  const db = openDb(":memory:");
+  const http = { ...fakeHttp(NETTO_PAGES), blockReason: () => "HTTP 429 (Retry-After: 3600)" };
+  await assert.rejects(
+    fetchWeek({ db, http, household: { ...household, storeMode: "fixed", fixedStore: "Netto" }, items: ["laks", "æg"], now: FRIDAY, log: () => {} }),
+    SourceBlockedError,
+  );
   assert.equal(db.prepare("SELECT 1 FROM fetches").get(), undefined);
 });
 

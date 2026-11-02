@@ -24,7 +24,8 @@ export type HttpOptions = {
 export type HttpClient = {
   /** Page body, or null if the page was skipped (blocked, disallowed, cap reached or failed). */
   get(url: string): Promise<string | null>;
-  isBlocked(url: string): boolean;
+  /** What the host answered when it stopped this run, or null if it hasn't. */
+  blockReason(url: string): string | null;
   pagesFetched(): number;
 };
 
@@ -39,6 +40,15 @@ const CACHE_WEEKS = 4;
 export function pruneCache(db: DB, now: Date = new Date()): number {
   const oldest = weekKey(new Date(mondayOf(planWeek(now)).getTime() - CACHE_WEEKS * 7 * 86_400_000));
   return db.prepare("DELETE FROM page_cache WHERE week < ?").run(oldest).changes;
+}
+
+/** The status and the headers that say why, e.g. "HTTP 429 (Retry-After: 3600, Server: cloudflare)". */
+function describeBlock(response: Response): string {
+  const details = ["Retry-After", "Server"].flatMap((name) => {
+    const value = response.headers.get(name);
+    return value ? [`${name}: ${value}`] : [];
+  });
+  return `HTTP ${response.status}${details.length ? ` (${details.join(", ")})` : ""}`;
 }
 
 export function createHttpClient(options: HttpOptions): HttpClient {
@@ -57,7 +67,7 @@ export function createHttpClient(options: HttpOptions): HttpClient {
   const pruned = pruneCache(db, now());
   if (pruned) log(`${pruned} gemte sider ældre end ${CACHE_WEEKS} uger er slettet.`);
 
-  const blockedHosts = new Set<string>();
+  const blockedHosts = new Map<string, string>();
   const robotsByHost = new Map<string, Robots>();
   /** The page cap is per site: Goma's limit is Goma's, not eTilbudsavis'. */
   const requestsByHost = new Map<string, number>();
@@ -91,19 +101,24 @@ export function createHttpClient(options: HttpOptions): HttpClient {
     }
   }
 
-  function block(host: string, reason: string): void {
-    blockedHosts.add(host);
-    log(`STOP: ${host} ${reason}. Kilden bruges ikke mere i denne kørsel.`);
+  function block(url: string, response: Response): void {
+    const reason = describeBlock(response);
+    const { host } = new URL(url);
+    blockedHosts.set(host, reason);
+    log(`STOP: ${host} svarede ${reason} på ${url}. Kilden bruges ikke mere i denne kørsel.`);
   }
 
-  async function cachedText(url: string): Promise<string | null | "blocked"> {
+  async function cachedText(url: string): Promise<string | null> {
     const week = planWeek(now());
     const cached = readCache.get(url, week) as { body: string } | undefined;
     if (cached) return cached.body;
 
     const response = await request(url);
     if (!response) return null;
-    if (response.status === 403 || response.status === 429) return "blocked";
+    if (response.status === 403 || response.status === 429) {
+      block(url, response);
+      return null;
+    }
     if (!response.ok) {
       log(`Springer over ${url}: HTTP ${response.status}.`);
       return null;
@@ -129,7 +144,7 @@ export function createHttpClient(options: HttpOptions): HttpClient {
         robots = disallowAll;
         log(`robots.txt for ${origin.host} kunne ikke hentes. Henter ikke fra værten.`);
       } else if (response.status === 403 || response.status === 429) {
-        block(origin.host, `svarede ${response.status} på robots.txt`);
+        block(robotsUrl, response);
         robots = disallowAll;
       } else if (response.status >= 400 && response.status < 500) {
         robots = allowAll; // RFC 9309: an unavailable robots.txt allows everything.
@@ -169,14 +184,9 @@ export function createHttpClient(options: HttpOptions): HttpClient {
         return null;
       }
 
-      const result = await cachedText(url);
-      if (result === "blocked") {
-        block(parsed.host, "svarede 403 eller 429");
-        return null;
-      }
-      return result;
+      return cachedText(url);
     },
-    isBlocked: (url) => blockedHosts.has(new URL(url).host),
+    blockReason: (url) => blockedHosts.get(new URL(url).host) ?? null,
     pagesFetched: () => requests,
   };
 }

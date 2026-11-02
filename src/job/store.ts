@@ -34,6 +34,13 @@ export class SourceChangedError extends Error {
   }
 }
 
+/** Goma answered 403 or 429. Its pages may be fine; it just won't serve them to us. */
+export class SourceBlockedError extends Error {
+  constructor(reason: string) {
+    super(`Goma afviser hentningen: ${reason}.`);
+  }
+}
+
 export function slugFor(store: string): string {
   const slug = STORE_SLUGS[store];
   if (!slug) throw new Error(`Ukendt butik "${store}". Kendte butikker: ${Object.keys(STORE_SLUGS).join(", ")}.`);
@@ -74,6 +81,8 @@ export async function chooseStore(
   for (const protein of PROTEINS) {
     const page = await fetchSearch(http, protein);
     if (!page) {
+      const blocked = http.blockReason("https://goma.gg/");
+      if (blocked) throw new SourceBlockedError(blocked);
       log(`Kunne ikke hente tilbud på ${protein}. Butiksvalget bruger de andre proteiner.`);
       continue;
     }

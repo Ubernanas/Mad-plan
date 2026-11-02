@@ -12,7 +12,7 @@ import type { Recipe } from "../recipes.ts";
 import { mondayOf, planWeek, weekKey } from "../week.ts";
 import { getKitchenDraft, isExpired, listKitchen, todayIso } from "../kitchen.ts";
 import { chooseQueries, kitchenStock, offerWeights, selectMains, selectSides, type KitchenStock } from "./candidates.ts";
-import { chooseStore, SourceChangedError, type StoreChoice } from "./store.ts";
+import { chooseStore, SourceBlockedError, SourceChangedError, type StoreChoice } from "./store.ts";
 
 /** Goma pages per run, robots.txt and the store choice included (CLAUDE.md: about 25). */
 const GOMA_PAGES = 24;
@@ -75,6 +75,8 @@ export async function fetchWeek({
   // The fixed list decides whether Goma still works; the recipes' words may simply not exist there.
   const missing = await fetchAll(items);
   if (missing.length > items.length / 2) {
+    const blocked = http.blockReason("https://goma.gg/");
+    if (blocked) throw new SourceBlockedError(blocked);
     throw new SourceChangedError(`${missing.length} af ${items.length} varer gav 0 rækker (${missing.join(", ")}).`);
   }
 
@@ -99,7 +101,7 @@ export async function fetchWeek({
   const room = Math.max(0, GOMA_PAGES - http.pagesFetched());
   empty.push(...await fetchAll(fallbacks.slice(0, room)));
   unfetched.push(...fallbacks.slice(room));
-  if (!http.isBlocked("https://goma.gg/")) for (const query of empty) failed.set(query, week);
+  if (!http.blockReason("https://goma.gg/")) for (const query of empty) failed.set(query, week);
   setMeta(db, "emptyQueries", JSON.stringify(Object.fromEntries(failed)));
   if (empty.length) log(`Ingen varer for: ${empty.join(", ")}.`);
 

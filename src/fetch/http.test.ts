@@ -5,7 +5,7 @@ import { createHttpClient, pruneCache, userAgent } from "./http.ts";
 import { parseRobots } from "./robots.ts";
 import { planWeek, weekKey } from "../week.ts";
 
-type Route = { status: number; body?: string };
+type Route = { status: number; body?: string; headers?: Record<string, string> };
 
 function fakeServer(routes: Record<string, Route>) {
   const calls: { url: string; userAgent: string | null }[] = [];
@@ -13,7 +13,7 @@ function fakeServer(routes: Record<string, Route>) {
     const url = String(input);
     calls.push({ url, userAgent: new Headers(init?.headers).get("User-Agent") });
     const route = routes[url] ?? { status: 404, body: "" };
-    return new Response(route.body ?? "", { status: route.status });
+    return new Response(route.body ?? "", { status: route.status, headers: route.headers });
   }) as typeof fetch;
   return { calls, fetchImpl };
 }
@@ -89,9 +89,32 @@ test("stops the host on 403 or 429", async () => {
   });
   assert.equal(await http.get("https://goma.gg/tilbud/laks"), null);
   assert.equal(await http.get("https://goma.gg/tilbud/ris"), null);
-  assert.ok(http.isBlocked("https://goma.gg/tilbud/ris"));
+  assert.equal(http.blockReason("https://goma.gg/tilbud/ris"), "HTTP 429");
   assert.equal(calls.length, 2);
   assert.ok(logs.some((l) => l.startsWith("STOP")));
+});
+
+test("a block logs the exact status, Retry-After and Server, and which page", async () => {
+  const { http, logs } = client({
+    [ROBOTS]: { status: 200, body: "" },
+    "https://goma.gg/tilbud/laks": { status: 403, headers: { "Retry-After": "3600", Server: "cloudflare" } },
+  });
+  await http.get("https://goma.gg/tilbud/laks");
+  assert.equal(http.blockReason("https://goma.gg/"), "HTTP 403 (Retry-After: 3600, Server: cloudflare)");
+  assert.ok(logs.includes("STOP: goma.gg svarede HTTP 403 (Retry-After: 3600, Server: cloudflare) på https://goma.gg/tilbud/laks. Kilden bruges ikke mere i denne kørsel."));
+});
+
+test("a block on robots.txt logs its status too", async () => {
+  const { http, calls, logs } = client({ [ROBOTS]: { status: 429 } });
+  assert.equal(await http.get("https://goma.gg/tilbud/laks"), null);
+  assert.equal(http.blockReason("https://goma.gg/"), "HTTP 429");
+  assert.equal(calls.length, 1);
+  assert.ok(logs.some((l) => l.includes(`HTTP 429 på ${ROBOTS}`)));
+});
+
+test("a host that hasn't refused anything has no block reason", () => {
+  const { http } = client({});
+  assert.equal(http.blockReason("https://goma.gg/"), null);
 });
 
 test("respects the page cap, counting robots.txt", async () => {
