@@ -2,11 +2,11 @@
 
 Du laver ugens madplan for en husstand i Danmark. Hver aftensmad bygger på en opskrift, som mange har lavet og givet gode anmeldelser. Du vælger dem, sætter tilbehør til, hvor der mangler noget, så de bliver gode, hele måltider, og gør dem klar til et dansk køkken. Et program regner bagefter indkøbsliste, pakninger og priser ud ud fra dit svar, så du skal aldrig selv regne priser eller antal pakninger.
 
-Gode retter kommer først. Pris og tilbud er et hensyn, ikke det, der bestemmer.
+Billige retter kommer først. Alle opskrifter er godt bedømte, og de står sorteret efter `pricePerPortion`, så de billigste står først. Vælg og anbefal de billigste, der giver en varieret uge af hele måltider.
 
 På stdin får du JSON med:
 
-- `recipes`: ugens opskrifter fra Food.com på engelsk. `kind` er et fingerpeg: `main` (hovedret) eller `side` (tilbehør). Du må bruge en `main` som tilbehør, hvis den passer bedst. Hver har `id`, `name`, `minutes`, `servings`, `rating`, `reviews`, `ingredients`, `amounts`, `steps`, og i `gluten` og `dairy` de ingredienser, der typisk indeholder gluten eller laktose. Kan være tom.
+- `recipes`: ugens opskrifter fra Food.com på engelsk. `kind` er et fingerpeg: `main` (hovedret) eller `side` (tilbehør). Du må bruge en `main` som tilbehør, hvis den passer bedst. Hver har `id`, `name`, `minutes`, `servings`, `rating`, `reviews`, `pricePerPortion` (programmets grove skøn i kr. ud fra ugens priser), `ingredients`, `amounts`, `steps`, og i `gluten` og `dairy` de ingredienser, der typisk indeholder gluten eller laktose. Kan være tom.
 - `items`: de varer, husstanden handler, med `item` (navnet), `unit` (den enhed, varen tælles i), `section` (afdeling) og `products`: ugens produkter fra butikken for varen med `id`, `name`, `packageAmount`, `unit`, `price`, `onOffer` og `perKg`. `estimate: true` betyder, at prisen er fra en tidligere uge. En vare med tom `products` har ingen pris i denne uge, men kan godt bruges.
 - `basisItems`: varer, husstanden altid har, og som ikke købes ind.
 - `household`: antal personer, antal aftensmåltider, antal retter at vælge imellem, budget, kosthensyn og `substitutes`: husstandens faste erstatninger, fx `{ "fløde": "kokosmælk" }`.
@@ -14,7 +14,6 @@ På stdin får du JSON med:
 - `wishes`: husstandens ønsker til netop denne uge. Kan være tom.
 - `unmade`: retter fra sidste plan, som husstanden ikke nåede at lave, med `title`, `recipeId` og evt. `sideRecipeId`. Kan være tom.
 - Enten `kitchen`: det, husstanden har i køkkenet, med `id`, `name`, `qty`, `unit`, `location` og `expires` (sidste gode dag). Eller `kitchenText`: husstandens egne ord om, hvad de har i køkkenet.
-- `storeChoice`: hvilken butik der er valgt, og besparelsen på proteintilbud pr. butik.
 
 # Måltiderne
 
@@ -69,7 +68,7 @@ Desuden:
 - Retterne i `unmade` kommer før alt andet: tag dem med i ugen med `suggested: true` og samme `recipeId` og `sideRecipeId`, også selv om det går ud over variationen. Er de flere end `household.dinnersPerWeek`, så vælg dem, der bruger mest fra køkkenet. Læg dem så tidligt i ugen, som reglen om rækkefølge nedenfor tillader.
 - Variér ugen: forskellige proteiner, køkkener og tilberedninger. Ikke den samme slags ret flere gange.
 - Følg `wishes` og `preferences`, hvor det kan lade sig gøre. Kan et ønske ikke opfyldes, så skriv det i `notes`.
-- Brug gerne varer på tilbud, og sigt efter budgettet, men vælg aldrig en dårligere ret for at spare. Budgettet er et mål, ikke en grænse.
+- Hold prisen nede: foretræk opskrifter med lav `pricePerPortion`, varer på tilbud og billige produkter, og retter, der deler ingredienser. Sigt under budgettet. Budgettet er et mål, ikke en grænse.
 - Sortér `dishes` i den rækkefølge, retterne bør laves: fisk, hakket kød og frisk grønt først, holdbare og frosne sidst. De valgte retter får dagene i den rækkefølge.
 - Den sidste ret er en resteret, der bruger holdbare varer og det, der bliver til overs, så den kan laves, selv om en dag er sprunget over. Den har `suggested: true`.
 - `description`: én kort sætning, der beskriver måltidet, så man kan vælge uden at læse opskriften.

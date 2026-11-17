@@ -36,8 +36,8 @@ export class SourceChangedError extends Error {
 
 /** Goma answered 403 or 429. Its pages may be fine; it just won't serve them to us. */
 export class SourceBlockedError extends Error {
-  constructor(reason: string) {
-    super(`Goma afviser hentningen: ${reason}.`);
+  constructor(reason: string, source = "Goma") {
+    super(`${source} afviser hentningen: ${reason}.`);
   }
 }
 

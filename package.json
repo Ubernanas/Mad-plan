@@ -16,7 +16,8 @@
     "dev": "tsx watch src/server.ts",
     "start": "node src/server.ts",
     "build-art": "tsx scripts/build-art.ts",
-    "import-recipes": "tsx scripts/import-recipes.ts"
+    "import-recipes": "tsx scripts/import-recipes.ts",
+    "rema-map": "tsx scripts/rema-map.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",

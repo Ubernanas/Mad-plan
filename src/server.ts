@@ -245,7 +245,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const db = openDb();
   syncItems(db, itemsFromRules(loadIngredientRules()));
   resetInterruptedJob(db);
-  // Only on Fly (or when asked), so a dev server on a laptop never fetches from Goma as well.
+  // Only on Fly (or when asked), so a dev server on a laptop never fetches from REMA as well.
   if (process.env.FLY_APP_NAME || process.env.CRON === "on") startCron(db);
   const port = Number(process.env.PORT) || 3000;
   serve({ fetch: createApp(db).fetch, port }, () => console.log(`[web] http://localhost:${port}`));

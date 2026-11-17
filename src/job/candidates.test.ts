@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { loadIngredientRules } from "../config.ts";
-import type { GomaProduct } from "../fetch/goma.ts";
 import type { Protein, Recipe } from "../recipes.ts";
-import { chooseQueries, kitchenStock, offerWeights, queriesOf, ruleFor, selectMains, selectSides } from "./candidates.ts";
+import { isDinner, kitchenStock, queriesOf, ruleFor, selectMains, selectSides } from "./candidates.ts";
+import { portionCost, priceIndex } from "./cost.ts";
 
 const rules = loadIngredientRules();
 const glutenAndLactoseFree = { glutenFree: true, lactoseFree: true, other: "" };
@@ -83,15 +83,6 @@ test("the kitchen as search words: ticked products by their search word, text an
   assert.deepEqual([...kitchenStock([], "2 løg, en halv pose ris og en dåse kokosmælk", known, "2026-10-30").keys()], ["ris", "løg", "kokosmælk"]);
 });
 
-test("recipes that use the kitchen rank higher, most of all what is about to expire", () => {
-  const plain = recipe({ ingredients: ["chicken", "rice", "salt"], reviews: 100 });
-  const usesBeef = recipe({ ingredients: ["ground beef", "rice", "salt"], proteins: ["beef"], reviews: 100 });
-  const opts = (stock: [string, boolean][]) => options({ count: 1, kitchen: { stock: new Map(stock), rules, buying: { diet: noDiet } } });
-  for (const seed of ["a", "b", "c", "d"]) {
-    assert.equal(selectMains([plain, usesBeef], noOffers, { ...opts([["hakket-oksekød", true]]), seed })[0], usesBeef, seed);
-  }
-});
-
 let nextId = 1;
 function recipe(over: Partial<Recipe> = {}): Recipe {
   return {
@@ -101,33 +92,20 @@ function recipe(over: Partial<Recipe> = {}): Recipe {
   };
 }
 
-test("the proteins on offer at the chosen store weigh by their saving", () => {
-  const product = (store: string, price: number, normalPrice: number | null, onOffer = true) =>
-    ({ store, price, normalPrice, onOffer }) as GomaProduct;
-  const weights = offerWeights([
-    { query: "kylling", product: product("Netto", 40, 60) },
-    { query: "kylling", product: product("Netto", 30, 30) },
-    { query: "kylling", product: product("Føtex", 10, 90) },
-    { query: "laks", product: product("Netto", 50, 65) },
-    { query: "svinekød", product: product("Netto", 20, null) },
-  ], "Netto");
-  assert.deepEqual(weights, { chicken: 20, beef: 0, pork: 0, fish: 15, veg: 0 });
-});
-
-const noOffers: Record<Protein, number> = { chicken: 0, beef: 0, pork: 0, fish: 0, veg: 0 };
-const options = (over = {}) => ({ diet: noDiet, recent: new Set<number>(), count: 10, seed: "2026-W45", ...over });
+const flat = () => 0;
+const options = (over = {}) => ({ diet: noDiet, recent: new Set<number>(), count: 10, seed: "2026-W45", cost: flat, ...over });
 
 test("mains leave out recent dishes and too many diet swaps, but never unpriced or unknown ingredients", () => {
   const recent = recipe();
   const glutenHeavy = recipe({ gluten: ["flour", "breadcrumbs", "soy sauce"] });
   const strange = recipe({ ingredients: ["chicken", "tahini", "za'atar", "sumac", "salt"] });
   const side = recipe({ kind: "side" });
-  const chosen = selectMains([recent, glutenHeavy, strange, side], noOffers, options({
+  const chosen = selectMains([recent, glutenHeavy, strange, side], options({
     recent: new Set([recent.id]), diet: glutenAndLactoseFree,
   }));
   assert.deepEqual(chosen.map((r) => r.id), [strange.id]);
   // Without the diet, gluten is no reason to leave a dish out.
-  assert.ok(selectMains([glutenHeavy], noOffers, options()).length === 1);
+  assert.ok(selectMains([glutenHeavy], options()).length === 1);
 });
 
 test("sides: the best of each kind, at most 4 per category, so the pairings vary", () => {
@@ -139,35 +117,71 @@ test("sides: the best of each kind, at most 4 per category, so the pairings vary
   assert.ok(chosen.every((r) => r.kind === "side"));
 });
 
-test("the protein on offer gets most of the candidates, but every protein gets some", () => {
+test("the cheapest mains come first, but every protein gets a few", () => {
   const pool = (["chicken", "beef", "pork", "fish", "veg"] as Protein[]).flatMap((p) =>
-    Array.from({ length: 20 }, () => recipe({ proteins: [p] })));
-  const chosen = selectMains(pool, { ...noOffers, pork: 100 }, options({ count: 20 }));
+    Array.from({ length: 20 }, () => recipe({ proteins: [p], ...(p === "veg" ? { ingredients: ["black beans", "rice"] } : {}) })));
+  const price: Record<Protein, number> = { pork: 10, chicken: 20, veg: 25, beef: 40, fish: 50 };
+  const chosen = selectMains(pool, options({ count: 20, cost: (r: Recipe) => price[r.proteins[0]!] }));
   const count = (p: Protein) => chosen.filter((r) => r.proteins[0] === p).length;
   assert.equal(chosen.length, 20);
   assert.ok(count("pork") >= 8, `pork ${count("pork")}`);
-  for (const p of ["chicken", "beef", "fish", "veg"] as Protein[]) assert.ok(count(p) >= 1, p);
+  for (const p of ["chicken", "beef", "fish", "veg"] as Protein[]) assert.ok(count(p) >= 3, p);
+  // Cheapest first.
+  assert.equal(chosen[0]!.proteins[0], "pork");
 });
 
 test("the same week gives the same candidates; another week mixes them differently", () => {
   const pool = Array.from({ length: 60 }, () => recipe());
-  const ids = (seed: string) => selectMains(pool, noOffers, options({ seed })).map((r) => r.id).join();
+  const ids = (seed: string) => selectMains(pool, options({ seed })).map((r) => r.id).join();
   assert.equal(ids("2026-W45"), ids("2026-W45"));
   assert.notEqual(ids("2026-W45"), ids("2026-W46"));
 });
 
-test("search words: unpriced first, then the most needed, within the budget, never failed ones", () => {
-  const candidates = [
-    recipe({ ingredients: ["chicken", "carrots", "ginger", "soy sauce"] }),
-    recipe({ ingredients: ["chicken", "carrots", "lime"] }),
-    recipe({ ingredients: ["pork", "carrots", "lime", "honey"] }),
-  ];
-  const result = chooseQueries(candidates, rules, {
-    diet: noDiet, fixed: ["kylling", "svinekød"], budget: 3, fresh: new Set(["gulerødder"]), failed: new Set(["honning"]),
-  });
-  // Carrots are needed most but priced from last week, so lime, ginger and soy go first.
-  assert.deepEqual(result, { queries: ["lime", "ingefær", "soyasauce"], unfetched: ["gulerødder"] });
-  assert.deepEqual(chooseQueries(candidates, rules, {
-    diet: noDiet, fixed: [], budget: -2, fresh: new Set(), failed: new Set(),
-  }).queries, []);
+const product = (price: number, packageAmount: number, unit: "g" | "ml" | "stk" = "g") => ({ price, packageAmount, unit });
+
+test("the price index keeps the cheapest price per unit for each search word", () => {
+  const index = priceIndex([
+    { query: "kylling", product: product(49, 650) },
+    { query: "kylling", product: product(25, 400) },
+    { query: "agurk", product: product(10, 1, "stk") },
+    { query: "løg", product: { price: 7, packageAmount: null, unit: null } },
+  ]);
+  assert.equal(index.get("kylling")!.perUnit, 25 / 400);
+  assert.deepEqual(index.get("agurk"), { perUnit: 10, unit: "stk" });
+  assert.equal(index.has("løg"), false);
+});
+
+test("a portion costs a typical amount of each ingredient: meat matters most, basis items nothing", () => {
+  const prices = priceIndex([
+    { query: "kylling", product: product(60, 1000) },
+    { query: "hakket-oksekød", product: product(100, 1000) },
+    { query: "ris", product: product(10, 1000) },
+    { query: "løg", product: product(5, 1000) },
+  ]);
+  const cost = (ingredients: string[], over: Partial<Recipe> = {}, stock?: Map<string, boolean>) =>
+    portionCost(recipe({ ingredients, ...over }), { rules, buying: { diet: noDiet }, prices, stock });
+  // 500 g chicken (30 kr), 150 g rice (1.50), 250 g onion (1.25), salt free: 32.75 kr / 4.
+  assert.equal(cost(["chicken breasts", "rice", "onion", "salt"]), 8.19);
+  assert.ok(cost(["ground beef", "rice", "onion", "salt"]) > cost(["chicken breasts", "rice", "onion", "salt"]));
+  // Without a price this week it is a guess, not a reason to leave the dish out.
+  assert.equal(cost(["chicken breasts", "lime"]), (30 + 10) / 4);
+  // Two lines for the same item count once; servings divide.
+  assert.equal(cost(["chicken thighs", "chicken breasts"], { servings: 2 }), 15);
+  // The kitchen's items are free, and those about to expire pull the price down.
+  assert.equal(cost(["chicken breasts", "rice"], {}, new Map([["kylling", false]])), 0.38);
+  assert.equal(cost(["chicken breasts", "rice"], {}, new Map([["kylling", true]])), 0);
+  // A recipe that lists only the seasoning still needs its meat bought.
+  assert.equal(cost(["salt", "dried thyme", "olive oil"], { proteins: ["chicken"] }), 7.5);
+  // Nothing to buy and no meat: not food.
+  assert.equal(cost(["salt", "white vinegar"], { proteins: [] }), Infinity);
+});
+
+test("only dinners: no cakes or doughs, and a vegetarian main needs beans, lentils or tofu", () => {
+  const lentils = recipe({ name: "Turkish Red Lentil Soup", proteins: ["veg"], ingredients: ["red lentils", "onion"] });
+  const eggs = recipe({ name: "Fried Eggs With Dill", proteins: ["veg"], ingredients: ["eggs", "dill"] });
+  const cake = recipe({ name: "Death by Chocolate Cake", proteins: ["veg"], ingredients: ["eggs", "kidney beans"] });
+  const chicken = recipe({ name: "Chicken Souvlaki" });
+  const fries = recipe({ kind: "side", name: "Pub Fries", proteins: [], ingredients: ["potatoes", "oil"] });
+  assert.deepEqual([lentils, eggs, cake, chicken, fries].filter(isDinner), [lentils, chicken, fries]);
+  assert.deepEqual(selectMains([eggs, lentils, cake], options()), [lentils]);
 });

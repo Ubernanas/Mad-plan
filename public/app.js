@@ -633,11 +633,6 @@ function screenSettings() {
       <span class="value">${value}${unit}</span>
       <button class="step" data-action="step" data-key="${key}" data-delta="${step}" aria-label="${label} flere">+</button>
     </div>`;
-  const storeRow = (label, mode, store) => {
-    const on = mode === "cheapest" ? s.storeMode === "cheapest" : s.storeMode === "fixed" && s.fixedStore === store;
-    return `<button class="row${on ? " chosen" : ""}" data-action="store" data-mode="${mode}" data-store="${esc(store ?? "")}" aria-pressed="${on}">
-      <span class="box round" aria-hidden="true">${on ? "●" : ""}</span><span class="main">${label}</span></button>`;
-  };
   return `${back}
     <header class="stack">
       <h1>Indstillinger</h1>
@@ -660,11 +655,8 @@ function screenSettings() {
       </div>
     </div>
     <div class="section">
-      <h2 class="section-title">Butik</h2>
-      <div class="list">
-        ${storeRow("Billigste: størst besparelse på tilbud", "cheapest")}
-        ${(state.stores ?? []).map((store) => storeRow(`Altid ${esc(store)}`, "fixed", store)).join("")}
-      </div>
+      <h2 class="section-title">Priser</h2>
+      <p class="muted">Priserne kommer fra REMA 1000, og planen vælger de billigste retter ud fra dem. I kan handle, hvor I vil.</p>
     </div>`;
 }
 

@@ -1,10 +1,10 @@
 # Madplan
 
-Personligt system, der hver uge henter tilbud fra de butikker, vi handler i, og laver en madplan og en indkøbsliste ud fra dem. Kun til eget brug (Tristan og Sille). Det er ikke et produkt: hold det simpelt, og byg kun den fase, vi er i.
+Personligt system, der hver uge henter priser og tilbud fra REMA 1000 og laver en madplan med de billigste gode retter og en indkøbsliste ud fra dem. Vi kan handle, hvor vi vil; REMA's priser er målestokken. Kun til eget brug (Tristan og Sille). Det er ikke et produkt: hold det simpelt, og byg kun den fase, vi er i.
 
 ## Hvad det gør (når alle faser er bygget)
 
-1. **Søndag, når vi er klar,** retter vi evt. køkkenet og trykker "Lav planen". Koden henter ugens tilbud og priser fra Goma og gemmer dem i SQLite. Den vælger de bedst bedømte hovedretter og tilbehør fra Food.com-datasættet (proteiner på tilbud får flere pladser), og deres ingredienser bestemmer, hvilke varer der hentes.
+1. **Søndag, når vi er klar,** retter vi evt. køkkenet og trykker "Lav planen". Koden henter ugens priser og tilbud fra REMA 1000's webshop og gemmer dem i SQLite. Den vælger de godt bedømte hovedretter og tilbehør fra Food.com-datasættet, der er billigst pr. portion med ugens priser (lidt af hvert protein).
 2. **Valgfrit (P3):** før vi trykker, kan vi skrive, hvad vi har i køkkenet; opskrifterne vælges så, så de bruger det.
 3. **Søndag kl. 18 (Europe/Copenhagen)** sker det samme automatisk, hvis planen ikke allerede er lavet. Når tilbuddene er hentet, sætter `claude -p` `dishOptions` aftensmåltider (standard 12) sammen af en hovedret og et tilbehør, oversætter og tilpasser dem og anbefaler `dinnersPerWeek` af dem. Koden bygger indkøbslisten og regner alle priser ud.
 4. Planen vises på en mobilvenlig webside med ugens retter og en indkøbsliste, vi begge kan krydse af. Claudes anbefalede retter er valgt på forhånd, men vi kan selv vælge andre blandt forslagene.
@@ -47,6 +47,10 @@ Claudes egne opskrifter var for kedelige (ingen saucer, lidt sjæl), så rettern
 
 Planen står i `docs/data-model-v2.md`: canonical items, prislog og opskrifter, der oversættes én gang. Følg dens trin i rækkefølge, og reglerne i "Data og opdateringer".
 
+### Priser fra REMA 1000 (november 2026)
+
+Goma afviste hentningen, så priserne kommer nu fra REMA 1000's webshop, og retterne vælges efter pris: blandt de godt bedømte opskrifter kommer de billigste pr. portion først. Automatisk butiksvalg og Goma bruges ikke mere (koden står der stadig). Se "Tilbudsdata" og "Opskrifterne".
+
 ### Ikke i nogen fase
 
 Brugerkonti, flere husstande, notifikationer, bedømmelse af retter, byt én ret med et nyt Claude-kald (valg blandt forslagene dækker behovet), native app. Senere features står i `docs/ideer.md`: lagerkøb og "planlæg resten af ugen igen". Køleskabsskærmen (`#/skaerm`) er bygget. Byg dem ikke, men design datamodellen, så de kan tilføjes: gem kilopriser, og giv `kitchen`-tabellen mængde, enhed, placering (køl, frost, skab) og holdbarhed fra start.
@@ -59,11 +63,12 @@ Brugerkonti, flere husstande, notifikationer, bedømmelse af retter, byt én ret
 - **Mapper:**
   - `src/server.ts`: web og routes
   - `src/fetch/http.ts`: fælles HTTP-klient med User-Agent, pauser og cache
-  - `src/fetch/goma.ts`: henter og parser Gomas søgesider
-  - `src/fetch/validity.ts` (P2): avisernes gyldighedsdatoer fra eTilbudsavis
-  - `src/job/store.ts`: vælger ugens butik
+  - `src/fetch/rema.ts`: henter og parser REMA 1000's kategorisider
+  - `src/fetch/rema-match.ts` og `config/rema.json`: hvilken ingrediens (søgeord) et REMA-produkt er. `npm run rema-map` viser, hvad hvert søgeord finder i `fixtures/rema-products.json`
+  - `src/fetch/goma.ts`, `src/fetch/validity.ts`, `src/job/store.ts`: Goma, eTilbudsavis og butiksvalg. Bruges ikke længere
   - `src/recipes.ts`: læser og filtrerer Food.com-datasættet; `scripts/import-recipes.ts` laver `recipes/foodcom.json.gz` ud fra det
-  - `src/job/candidates.ts`: vælger ugens opskrifter ud fra tilbuddene og søgeordene ud fra deres ingredienser
+  - `src/job/cost.ts`: en grov pris pr. portion for en opskrift ud fra ugens priser
+  - `src/job/candidates.ts`: vælger ugens opskrifter, de billigste pr. portion først
   - `src/job/generate.ts`: bygger prompt, kører `claude -p` og validerer svaret
   - `src/job/compute.ts`: bygger indkøbslisten og regner priser og rester ud
   - `src/job/schema.json`: JSON Schema for Claudes svar
@@ -133,6 +138,17 @@ Godkendelse sker med `CLAUDE_CODE_OAUTH_TOKEN`, et 1-årigt token lavet lokalt m
 
 Der findes ikke et åbent API for danske tilbudsaviser. Gomas Data API kræver en aftale og bruges ikke. Koden henter derfor fra offentlige sider, høfligt og sjældent.
 
+### REMA 1000 (i brug)
+
+- **Kilde:** `shop.rema1000.dk/varer/<afdeling>/<kategori>`, 54 madkategorier (`REMA_CATEGORIES` i `src/fetch/rema.ts`). Siderne er server-renderet og har produkterne som Nuxt-data (`__NUXT_DATA__`): id, navn, størrelse, pris, normalpris og tilbuddets datoer. robots.txt tillader alt.
+- **Kun de 24 mest populære pr. kategori.** HTML'en har kun første side, og `?page=2` virker ikke; resten henter siden med JavaScript fra REMA's API. Derfor mangler fx laktosefri varianter og specialvarer (fiskesauce, kapers). De prissættes fra tidligere uger som skøn, eller kommer på listen som "pris ukendt".
+- **Prisen** er den, der gælder planugens mandag. Et tilbud har normalpris og sidste dag (`offerLastDay`), som giver "køb senest"; eTilbudsavis bruges ikke.
+- **Ingredienser:** `config/rema.json` siger pr. søgeord, i hvilke kategorier og med hvilke ord i navnet produktet findes ("HK. OKSEKØD 8-12%" er `hakket-oksekød`). Første regel, der passer, vinder. Produkter, ingen regel passer på, gemmes ikke. Køber en ingrediens det forkerte, rettes det her.
+- **Høflighed:** én kørsel om ugen, én side ad gangen med 2-4 sekunders pause (ca. 55 sider med robots.txt), samme cache pr. URL i ugen og samme stop ved 403/429 som før.
+- **Sikring mod tomme data:** er over halvdelen af kød- og fiskesiderne (`REMA_CORE`) eller over halvdelen af alle sider tomme, stopper jobbet før Claude med "kilden har ændret sig" (eller "REMA 1000 afviser hentningen" ved en blokering).
+
+Resten af dette afsnit beskriver Goma, som ikke bruges længere.
+
 ### Kilder
 
 - **Goma.** Søgesiderne er server-renderet HTML:
@@ -187,6 +203,7 @@ Giver en proteinsøgning 0 rækker, eller giver over halvdelen af den faste list
 
 - Kilden er Kaggle-datasættet "Food.com - Recipes and Reviews" (irkaal, CC0, 522.517 opskrifter). Det hentes i hånden som `datasets/recipes.csv`; `npm run import-recipes` filtrerer det til `recipes/foodcom.json.gz`.
 - Filteret: mindst 4,5 stjerner og 10 anmeldelser, og ingen desserter, brød, drikke, morgenmad, supper som tilbehør, marinader, dips eller saucer. Ved samme navn beholdes den med flest anmeldelser.
+- **Valget er billigst først:** `src/job/cost.ts` regner en grov pris pr. portion ud fra ugens REMA-priser (en typisk mængde pr. ingrediens, fx 500 g kød; uden pris 10 kr.; køkkenets varer gratis), og de billigste 40 hovedretter og 30 tilbehør går videre, med mindst 3 af hvert protein. Opskrifter, der ikke er aftensmad (kager, dej, en vegetarret med kun æg), er ude. Skønnet sendes med til Claude som `pricePerPortion`.
 - `kind`: `main` (et protein, højst 75 minutter, 4-16 ingredienser, 2-14 trin) eller `side` (kartofler, ris, salat, grønt uden eget kød, højst 60 minutter, 2-16 ingredienser). Pølser og kartofler er en hovedret; bacon i en kartoffelsalat er tilbehør.
 - Datasættet har mistet enhederne ("1/2", ikke "1/2 cup"), og mængderne passer ikke altid til ingredienserne. Begge lister gemmes, som de er, og Claude læser enhederne ud af trinene.
 - Claude oversætter til dansk og metrisk, skalerer, laver glutenfri og laktosefri varianter og bevarer saucer og krydderier. Opskriftens protein byttes aldrig (rejer med kylling er en anden ret); laks for anden fisk er i orden. Hver ret er en hel aftensmad, som en dansk husstand ville spise den; mangler opskriften noget, sætter Claude et tilbehør til fra Food.com eller et enkelt (kogte kartofler, ris, grøn salat). Det er Claudes vurdering, ikke kodens: ordlister kan ikke se, at karry med ris er et måltid. Mangler en vare i `products`, sættes den på med `buy` i stedet for at ændre retten. Siden viser "Efter Chicken Souvlaki (5 ★, 85 anmeldelser) og Greek Lemon Potatoes (4,8 ★, 120 anmeldelser) fra Food.com".

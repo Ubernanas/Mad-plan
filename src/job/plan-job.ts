@@ -1,9 +1,10 @@
 // Runs plan generation in the background, one at a time, and records how it
 // went so the page can show it. Used by "Lav planen" and by the 18:00 cron.
 
-import { loadIngredientRules, loadItems, loadItemSections, loadPreferences } from "../config.ts";
+import { loadIngredientRules, loadItemSections, loadPreferences } from "../config.ts";
 import { getMeta, setMeta, type DB } from "../db.ts";
 import { createHttpClient } from "../fetch/http.ts";
+import { REMA_HTTP } from "../fetch/rema.ts";
 import { getKitchenDraft, setKitchenDraft } from "../kitchen.ts";
 import { loadRecipes } from "../recipes.ts";
 import { effectiveHousehold } from "../settings.ts";
@@ -46,13 +47,13 @@ export function resetInterruptedJob(db: DB): void {
 
 /**
  * The week's offers and recipes, chosen with the kitchen as it is right now. Pages already
- * fetched this week come from the cache, so pressing "Lav planen" again costs Goma little.
- * Only on Fly (or with CRON=on), so a dev server never fetches from Goma.
+ * fetched this week come from the cache, so pressing "Lav planen" again costs REMA nothing.
+ * Only on Fly (or with CRON=on), so a dev server never fetches from REMA.
  */
 export async function fetchOffers(db: DB): Promise<void> {
   if (!process.env.FLY_APP_NAME && process.env.CRON !== "on") return;
   const summary = await fetchWeek({
-    db, http: createHttpClient({ db }), household: effectiveHousehold(db), items: loadItems(), recipes: loadRecipes(), rules: loadIngredientRules(),
+    db, http: createHttpClient({ db, ...REMA_HTTP }), household: effectiveHousehold(db), recipes: loadRecipes(), rules: loadIngredientRules(),
   });
   console.log(`[plan] Hentet ${summary.saved} varer fra ${summary.choice.store} for ${summary.week} (${summary.pagesFetched} sider, ${summary.candidates.length} opskrifter).`);
 }

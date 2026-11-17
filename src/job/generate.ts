@@ -59,6 +59,7 @@ export async function generatePlan({
   const products = loadProducts(db, week, fetch.store, JSON.parse(fetch.missing_json) as string[], catalog);
   const items = weekItems(db, products, sections);
   const candidates = loadCandidates(db, week, recipes);
+  const costs = JSON.parse(getMeta(db, `candidateCosts:${week}`) ?? "{}") as Record<number, number>;
   const today = todayIso(now());
   // Only those that are among the week's recipes can be used; the diet may have ruled some out.
   const unmade = unmadeDishes(db, week).filter((d) => candidates.has(d.recipeId)).map((d) => ({
@@ -69,7 +70,6 @@ export async function generatePlan({
     ? { text: kitchenText.trim() }
     : { items: listKitchen(db).filter((item) => !isExpired(item, today)) };
   const input = JSON.stringify({
-    storeChoice: { store: fetch.store, savingsOnProteinOffers: JSON.parse(fetch.savings_json) },
     household: {
       persons: household.persons,
       dinnersPerWeek: household.dinnersPerWeek,
@@ -89,8 +89,11 @@ export async function generatePlan({
       item, unit, section,
       products: own.map(({ query, estimate, item: _, ...p }) => (estimate ? { ...p, estimate } : p)),
     })),
-    recipes: [...candidates.values()].map(({ id, kind, name, minutes, servings, rating, reviews, ingredients, amounts, steps, gluten, dairy }) =>
-      ({ id, kind, name, minutes, servings, rating, reviews, ingredients, amounts, steps, gluten, dairy })),
+    // Cheapest first, as Sunday's fetch estimated them; weeks from before the estimate keep their order.
+    recipes: [...candidates.values()]
+      .map(({ id, kind, name, minutes, servings, rating, reviews, ingredients, amounts, steps, gluten, dairy }) =>
+        ({ id, kind, name, minutes, servings, rating, reviews, ...(id in costs ? { pricePerPortion: costs[id] } : {}), ingredients, amounts, steps, gluten, dairy }))
+      .sort((a, b) => (a.pricePerPortion ?? 0) - (b.pricePerPortion ?? 0)),
   });
   const prompt = buildPrompt(week, fetch.store, household, wishes, candidates.size > 0);
 
