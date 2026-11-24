@@ -1,6 +1,6 @@
 # Madplan
 
-Personligt system, der hver uge henter priser og tilbud fra REMA 1000 og laver en madplan med de billigste gode retter og en indkøbsliste ud fra dem. Vi kan handle, hvor vi vil; REMA's priser er målestokken. Kun til eget brug (Tristan og Sille). Det er ikke et produkt: hold det simpelt, og byg kun den fase, vi er i.
+Personligt system, der hver uge henter priser og tilbud fra REMA 1000 og laver en madplan med de billigste gode retter og en indkøbsliste ud fra dem. Vi kan handle, hvor vi vil; REMA's priser er målestokken. Kun til eget brug: Tristan og Sille, og venner, der hver kører deres egen kopi (se `README.md`). Det er ikke et produkt: hold det simpelt, og byg kun den fase, vi er i.
 
 ## Hvad det gør (når alle faser er bygget)
 

@@ -1,6 +1,6 @@
 # Præferencer
 
-Udfyldes af Tristan og Sille. Teksten sendes med til Claude, når planen laves.
+Udfyldes af husstanden. Teksten sendes med til Claude, når planen laves.
 
 ## Det kan vi lide
 

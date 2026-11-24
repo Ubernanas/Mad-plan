@@ -1,5 +1,5 @@
 # Fly.io config for Madplan. One always-on machine, so cron can run on Sundays.
-app = "madplan-tristan"
+app = "madplan-tristan"   # Dit eget navn: `fly launch` skriver det her (se README.md)
 primary_region = "arn"   # Stockholm
 
 [build]
